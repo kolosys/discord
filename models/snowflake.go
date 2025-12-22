@@ -3,10 +3,6 @@
 
 package models
 
-import (
-	"github.com/kolosys/discord/types"
-)
-
 // SnowflakeSelectDefaultValueTypes
 type SnowflakeSelectDefaultValueTypes string
 
@@ -16,6 +12,5 @@ const (
 	SnowflakeSelectDefaultValueTypesChannel SnowflakeSelectDefaultValueTypes = "channel"
 )
 
-// SnowflakeType is a Discord snowflake ID used in API requests.
-// It implements fmt.Stringer for use in path parameters.
-type SnowflakeType = types.Snowflake
+// SnowflakeType is a Discord snowflake ID (just a string).
+type SnowflakeType = string

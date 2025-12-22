@@ -1,19 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
+	"github.com/kolosys/discord/examples/internal"
 	"github.com/kolosys/discord/rest"
 )
 
 func main() {
-	loadEnv(".env")
+	internal.LoadEnv(".env")
 
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
@@ -51,25 +50,4 @@ func main() {
 	fmt.Printf("Recommended Shards: %d\n", gateway.Shards)
 
 	fmt.Println("\nREST API test complete!")
-}
-
-func loadEnv(path string) {
-	file, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		os.Setenv(strings.TrimSpace(key), strings.TrimSpace(value))
-	}
 }

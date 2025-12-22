@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kolosys/neuron"
 	"github.com/kolosys/discord/models"
+	"github.com/kolosys/neuron"
 )
 
 // Route definitions
@@ -398,7 +398,7 @@ var (
 		neuron.MethodPOST,
 		"/guilds/{guild_id}/bulk-ban",
 	)
-	ListGuildChannelsRoute = neuron.NewRoute[neuron.EmptyRequest, any](
+	ListGuildChannelsRoute = neuron.NewRoute[neuron.EmptyRequest, []models.GuildChannel](
 		neuron.MethodGET,
 		"/guilds/{guild_id}/channels",
 	)
@@ -2986,11 +2986,11 @@ func (c *RESTClient) BulkBanUsersFromGuild(ctx context.Context, guildid models.S
 }
 
 // ListGuildChannels executes GET /guilds/{guild_id}/channels
-func (c *RESTClient) ListGuildChannels(ctx context.Context, guildid models.SnowflakeType, opts ...*neuron.RequestOptions) (*neuron.Response[any], error) {
+func (c *RESTClient) ListGuildChannels(ctx context.Context, guildid models.SnowflakeType, opts ...*neuron.RequestOptions) (*neuron.Response[[]models.GuildChannel], error) {
 	path := "/guilds/{guild_id}/channels"
 	path = strings.Replace(path, "{guild_id}", fmt.Sprintf("%v", guildid), 1)
 
-	route := neuron.NewRoute[neuron.EmptyRequest, any](
+	route := neuron.NewRoute[neuron.EmptyRequest, []models.GuildChannel](
 		neuron.MethodGET,
 		path,
 	)
