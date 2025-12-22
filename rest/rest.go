@@ -27,9 +27,11 @@ type REST struct {
 
 // Options holds REST client configuration.
 type Options struct {
-	BaseURL   string
-	UserAgent string
-	Timeout   time.Duration
+	BaseURL          string
+	UserAgent        string
+	Timeout          time.Duration
+	RateLimiter      *RateLimiterConfig
+	DisableRateLimit bool
 }
 
 // New creates a new REST client with the given token and options.
@@ -57,9 +59,15 @@ func New(token string, opts *Options) *REST {
 		Headers:   headers,
 	})
 
+	var limiter *DiscordRateLimiter
+	if !opts.DisableRateLimit {
+		limiter = NewRateLimiter(opts.RateLimiter)
+	}
+
 	return &REST{
-		client: c,
-		token:  token,
+		client:  c,
+		token:   token,
+		limiter: limiter,
 	}
 }
 
@@ -71,8 +79,23 @@ func (r *REST) Token() string {
 	return r.token[:10] + "..." + r.token[len(r.token)-5:]
 }
 
+// RateLimiter returns the rate limiter for this client.
+func (r *REST) RateLimiter() *DiscordRateLimiter {
+	return r.limiter
+}
+
+func (r *REST) wait(ctx context.Context, method, endpoint string) error {
+	if r.limiter == nil {
+		return nil
+	}
+	return r.limiter.Wait(ctx, method, endpoint)
+}
+
 // GetGateway retrieves the gateway URL for connecting to the Discord gateway.
 func (r *REST) GetGateway(ctx context.Context) (*models.Gateway, error) {
+	if err := r.wait(ctx, "GET", "/gateway"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetGateway(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get gateway: %w", err)
@@ -82,6 +105,9 @@ func (r *REST) GetGateway(ctx context.Context) (*models.Gateway, error) {
 
 // GetBotGateway retrieves bot-specific gateway information including sharding.
 func (r *REST) GetBotGateway(ctx context.Context) (*models.GatewayBot, error) {
+	if err := r.wait(ctx, "GET", "/gateway/bot"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetBotGateway(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get bot gateway: %w", err)
@@ -91,6 +117,9 @@ func (r *REST) GetBotGateway(ctx context.Context) (*models.GatewayBot, error) {
 
 // GetMyApplication retrieves the current application's information.
 func (r *REST) GetMyApplication(ctx context.Context) (*models.PrivateApplication, error) {
+	if err := r.wait(ctx, "GET", "/applications/@me"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetMyApplication(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get my application: %w", err)
@@ -100,6 +129,9 @@ func (r *REST) GetMyApplication(ctx context.Context) (*models.PrivateApplication
 
 // GetUser retrieves a user by ID.
 func (r *REST) GetUser(ctx context.Context, userID types.Snowflake) (*models.User, error) {
+	if err := r.wait(ctx, "GET", "/users/"+userID.String()); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
@@ -109,6 +141,9 @@ func (r *REST) GetUser(ctx context.Context, userID types.Snowflake) (*models.Use
 
 // GetCurrentUser retrieves the current bot user.
 func (r *REST) GetCurrentUser(ctx context.Context) (*models.UserPII, error) {
+	if err := r.wait(ctx, "GET", "/users/@me"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetMyUser(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get current user: %w", err)
@@ -118,6 +153,9 @@ func (r *REST) GetCurrentUser(ctx context.Context) (*models.UserPII, error) {
 
 // GetGuild retrieves a guild by ID.
 func (r *REST) GetGuild(ctx context.Context, guildID types.Snowflake) (*models.GuildWithCounts, error) {
+	if err := r.wait(ctx, "GET", "/guilds/"+guildID.String()); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetGuild(ctx, guildID)
 	if err != nil {
 		return nil, fmt.Errorf("get guild: %w", err)
@@ -127,6 +165,9 @@ func (r *REST) GetGuild(ctx context.Context, guildID types.Snowflake) (*models.G
 
 // GetChannel retrieves a channel by ID.
 func (r *REST) GetChannel(ctx context.Context, channelID types.Snowflake) (any, error) {
+	if err := r.wait(ctx, "GET", "/channels/"+channelID.String()); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetChannel(ctx, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get channel: %w", err)
@@ -136,6 +177,9 @@ func (r *REST) GetChannel(ctx context.Context, channelID types.Snowflake) (any, 
 
 // CreateMessage sends a message to a channel.
 func (r *REST) CreateMessage(ctx context.Context, channelID types.Snowflake, msg models.MessageCreateOptions) (*models.Message, error) {
+	if err := r.wait(ctx, "POST", "/channels/"+channelID.String()+"/messages"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.CreateMessage(ctx, channelID, msg)
 	if err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
@@ -145,6 +189,9 @@ func (r *REST) CreateMessage(ctx context.Context, channelID types.Snowflake, msg
 
 // GetMessage retrieves a message by ID.
 func (r *REST) GetMessage(ctx context.Context, channelID, messageID types.Snowflake) (*models.Message, error) {
+	if err := r.wait(ctx, "GET", "/channels/"+channelID.String()+"/messages/"+messageID.String()); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetMessage(ctx, channelID, messageID)
 	if err != nil {
 		return nil, fmt.Errorf("get message: %w", err)
@@ -162,6 +209,10 @@ type ListMessagesParams struct {
 
 // ListMessages retrieves messages from a channel.
 func (r *REST) ListMessages(ctx context.Context, channelID types.Snowflake, params *ListMessagesParams) ([]models.Message, error) {
+	if err := r.wait(ctx, "GET", "/channels/"+channelID.String()+"/messages"); err != nil {
+		return nil, err
+	}
+
 	var reqOpts *neuron.RequestOptions
 	if params != nil {
 		query := make(map[string]any)
@@ -195,6 +246,9 @@ func (r *REST) ListMessages(ctx context.Context, channelID types.Snowflake, para
 
 // GetGuildMember retrieves a guild member by user ID.
 func (r *REST) GetGuildMember(ctx context.Context, guildID, userID types.Snowflake) (*models.GuildMember, error) {
+	if err := r.wait(ctx, "GET", "/guilds/"+guildID.String()+"/members/"+userID.String()); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.GetGuildMember(ctx, guildID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get guild member: %w", err)
@@ -204,6 +258,9 @@ func (r *REST) GetGuildMember(ctx context.Context, guildID, userID types.Snowfla
 
 // ListGuildMembers retrieves members from a guild.
 func (r *REST) ListGuildMembers(ctx context.Context, guildID types.Snowflake) ([]models.GuildMember, error) {
+	if err := r.wait(ctx, "GET", "/guilds/"+guildID.String()+"/members"); err != nil {
+		return nil, err
+	}
 	resp, err := r.client.ListGuildMembers(ctx, guildID)
 	if err != nil {
 		return nil, fmt.Errorf("list guild members: %w", err)
