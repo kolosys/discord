@@ -13,3 +13,7 @@ type Gateway struct {
 	events    *bus.EventBus
 	shards    *collection.Collection[int, *Shard]
 }
+
+func NewGateway(client *axon.Client[GatewayPayload]) *Gateway {
+	return &Gateway{client: client}
+}

@@ -3,6 +3,10 @@
 
 package models
 
+import (
+	"github.com/kolosys/discord/types"
+)
+
 // SnowflakeSelectDefaultValueTypes
 type SnowflakeSelectDefaultValueTypes string
 
@@ -12,6 +16,6 @@ const (
 	SnowflakeSelectDefaultValueTypesChannel SnowflakeSelectDefaultValueTypes = "channel"
 )
 
-// SnowflakeType
-type SnowflakeType struct {
-}
+// SnowflakeType is a Discord snowflake ID used in API requests.
+// It implements fmt.Stringer for use in path parameters.
+type SnowflakeType = types.Snowflake
