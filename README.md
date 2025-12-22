@@ -1,2 +1,1 @@
-# go-template
-Template for GO libraries
+# Discord GO Framework
