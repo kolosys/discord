@@ -4,10 +4,10 @@ go 1.24.0
 
 require (
 	github.com/kolosys/atomic v1.0.0
-	github.com/kolosys/axon v0.0.0-20251220202253-1f3fa1736024
-	github.com/kolosys/ion v0.2.0
-	github.com/kolosys/neuron v0.0.0-20251222071555-75ff4d7b908a
-	github.com/kolosys/nova v0.1.0
+	github.com/kolosys/axon v0.1.0
+	github.com/kolosys/ion v0.3.0
+	github.com/kolosys/neuron v0.2.0
+	github.com/kolosys/nova v0.2.0
 	github.com/kolosys/synapse v0.2.0
 )
 
