@@ -58,6 +58,12 @@ func (s *Shard) Connect(ctx context.Context, url string) error {
 	opts.Reconnect.InitialDelay = 1 * time.Second
 	opts.Reconnect.MaxDelay = 120 * time.Second
 
+	// Discord heartbeat interval is ~41.25 seconds, set read deadline longer to avoid timeout
+	opts.ReadDeadline = 90 * time.Second
+
+	// Disable WebSocket-level pings - Discord uses its own heartbeat mechanism (opcode 1)
+	opts.PingInterval = 0
+
 	// Create WebSocket client
 	client := axon.NewClient[GatewayPayload](gatewayURL, opts)
 
@@ -87,6 +93,9 @@ func (s *Shard) handlePayload(payload GatewayPayload) {
 	switch payload.Op {
 	case OpcodeHello:
 		s.handleHello(payload)
+	case OpcodeHeartbeat:
+		// Server requested an immediate heartbeat - respond without waiting
+		s.sendHeartbeat(s.session.Sequence())
 	case OpcodeHeartbeatACK:
 		s.hb.ACK()
 	case OpcodeDispatch:
@@ -292,36 +301,29 @@ func (s *Shard) handleDisconnect(c *axon.Client[GatewayPayload], err error) {
 	s.ready = false
 	s.mu.Unlock()
 
-	// Get close code and reason if available
-	conn := c.Conn()
-	if conn == nil {
+	// Check if error is an axon CloseError (contains close code and reason)
+	closeErr := axon.AsCloseError(err)
+	if closeErr == nil {
+		// No close code means network error or unexpected disconnect
 		log.Printf("[Shard %d] Disconnected from gateway: %v", s.id, err)
 		return
 	}
 
-	rawCode := conn.CloseCode()
-	reason := conn.CloseReason()
-
-	// No close code means network error or unexpected disconnect
-	if rawCode == 0 {
-		log.Printf("[Shard %d] Disconnected from gateway: %v", s.id, err)
-		return
-	}
-
-	code := CloseCode(rawCode)
+	// Map axon close code to Discord close code for detailed descriptions
+	code := CloseCode(closeErr.Code)
 
 	// Log with appropriate severity based on error type
 	if code.IsFatal() {
-		log.Printf("[Shard %d] FATAL: Disconnected from gateway (code: %d - %s)", s.id, rawCode, code.String())
-		if reason != "" {
-			log.Printf("[Shard %d] Reason: %s", s.id, reason)
+		log.Printf("[Shard %d] FATAL: Disconnected from gateway (code: %d - %s)", s.id, closeErr.Code, code.String())
+		if closeErr.Reason != "" {
+			log.Printf("[Shard %d] Reason: %s", s.id, closeErr.Reason)
 		}
 		log.Printf("[Shard %d] %s", s.id, code.Description())
 		log.Printf("[Shard %d] Reconnection disabled due to non-recoverable error", s.id)
 
 		// Store fatal error and close the client to prevent reconnection
 		s.mu.Lock()
-		s.fatalError = fmt.Errorf("gateway close code %d: %s", rawCode, code.String())
+		s.fatalError = fmt.Errorf("gateway close code %d: %s", closeErr.Code, code.String())
 		s.mu.Unlock()
 
 		// Close the client to stop reconnection attempts
@@ -331,9 +333,9 @@ func (s *Shard) handleDisconnect(c *axon.Client[GatewayPayload], err error) {
 			}
 		}()
 	} else {
-		log.Printf("[Shard %d] Disconnected from gateway (code: %d - %s)", s.id, rawCode, code.String())
-		if reason != "" {
-			log.Printf("[Shard %d] Reason: %s", s.id, reason)
+		log.Printf("[Shard %d] Disconnected from gateway (code: %d - %s)", s.id, closeErr.Code, code.String())
+		if closeErr.Reason != "" {
+			log.Printf("[Shard %d] Reason: %s", s.id, closeErr.Reason)
 		}
 		log.Printf("[Shard %d] %s", s.id, code.Description())
 		log.Printf("[Shard %d] Reconnection will be attempted...", s.id)

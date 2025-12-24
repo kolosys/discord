@@ -1,5 +1,7 @@
 package gateway
 
+import "github.com/kolosys/axon"
+
 // Opcode represents a Discord gateway opcode.
 type Opcode int
 
@@ -50,8 +52,11 @@ func (o Opcode) String() string {
 }
 
 // CloseCode represents a Discord gateway close code.
+// For standard WebSocket codes (1000-1015), use axon.CloseCode directly.
+// This type focuses on Discord-specific codes (4000+) with detailed descriptions.
 type CloseCode int
 
+// Discord-specific gateway close codes
 const (
 	CloseCodeUnknownError         CloseCode = 4000 // Unknown error
 	CloseCodeUnknownOpcode        CloseCode = 4001 // Invalid opcode sent
@@ -71,6 +76,7 @@ const (
 
 func (c CloseCode) String() string {
 	switch c {
+	// Discord-specific codes
 	case CloseCodeUnknownError:
 		return "Unknown Error"
 	case CloseCodeUnknownOpcode:
@@ -100,13 +106,17 @@ func (c CloseCode) String() string {
 	case CloseCodeDisallowedIntents:
 		return "Disallowed Intents"
 	default:
-		return "Unknown"
+		// Delegate to axon for standard WebSocket codes
+		return axon.CloseCode(c).String()
 	}
 }
 
 // Description returns a detailed, actionable description of the close code.
+// For Discord-specific codes, provides actionable guidance.
+// For standard WebSocket codes, provides context relevant to Discord gateway usage.
 func (c CloseCode) Description() string {
 	switch c {
+	// Discord-specific codes with actionable guidance
 	case CloseCodeUnknownError:
 		return "An unknown error occurred. This is typically transient - reconnection will be attempted."
 	case CloseCodeUnknownOpcode:
@@ -139,7 +149,30 @@ func (c CloseCode) Description() string {
 			"https://discord.com/developers/applications → Bot → Privileged Gateway Intents. " +
 			"Privileged intents include: GUILD_MEMBERS, GUILD_PRESENCES, and MESSAGE_CONTENT."
 	default:
-		return "An unrecognized close code was received."
+		// For standard WebSocket codes and unknown codes, provide generic description
+		return describeWebSocketCode(axon.CloseCode(c))
+	}
+}
+
+// describeWebSocketCode provides Discord-relevant descriptions for standard WebSocket close codes.
+func describeWebSocketCode(c axon.CloseCode) string {
+	switch c {
+	case axon.CloseNormalClosure:
+		return "The connection was closed normally. No action required."
+	case axon.CloseGoingAway:
+		return "The Discord gateway is shutting down. Reconnection will be attempted."
+	case axon.CloseProtocolError:
+		return "A protocol error occurred. This may indicate a client bug or network issue."
+	case axon.CloseInternalError:
+		return "Discord encountered an internal error. Reconnection will be attempted."
+	case axon.CloseServiceRestart:
+		return "Discord is restarting. Reconnection will be attempted shortly."
+	case axon.CloseTryAgainLater:
+		return "Discord is temporarily unavailable. Reconnection will be attempted with backoff."
+	case axon.CloseAbnormalClosure:
+		return "The connection was closed abnormally. Check network connectivity."
+	default:
+		return "A WebSocket error occurred: " + c.String()
 	}
 }
 
