@@ -7,6 +7,8 @@ import (
 
 	"github.com/kolosys/discord/gateway"
 	"github.com/kolosys/discord/rest"
+	"github.com/kolosys/ion/workerpool"
+	"github.com/kolosys/nova/bus"
 )
 
 // Client is the main Discord client that manages REST and Gateway connections.
@@ -14,6 +16,8 @@ type Client struct {
 	token   string
 	rest    *rest.REST
 	gateway *gateway.Gateway
+	events  bus.EventBus
+	worker  *workerpool.Pool
 
 	mu      sync.RWMutex
 	running bool
@@ -32,11 +36,30 @@ func New(opts *Options) (*Client, error) {
 		return nil, fmt.Errorf("discord: token is required")
 	}
 
+	// Create REST client
 	r := rest.New(opts.Token, opts.REST)
 
+	// Create worker pool for event processing
+	worker := workerpool.New(10, 100, workerpool.WithName("discord-events"))
+
+	// Create event bus
+	eventBus := bus.New(bus.Config{
+		WorkerPool:          worker,
+		DefaultBufferSize:   1000,
+		DefaultPartitions:   4,
+		DefaultDeliveryMode: bus.AtLeastOnce,
+		Name:                "discord",
+	})
+
+	// Create gateway
+	gw := gateway.NewGateway(opts.Token, opts.Intents, eventBus)
+
 	return &Client{
-		token: opts.Token,
-		rest:  r,
+		token:   opts.Token,
+		rest:    r,
+		gateway: gw,
+		events:  eventBus,
+		worker:  worker,
 	}, nil
 }
 
@@ -50,6 +73,11 @@ func (c *Client) Gateway() *gateway.Gateway {
 	return c.gateway
 }
 
+// Events returns the event bus for subscribing to Discord events.
+func (c *Client) Events() bus.EventBus {
+	return c.events
+}
+
 // Start connects to the Discord gateway and begins receiving events.
 func (c *Client) Start(ctx context.Context) error {
 	c.mu.Lock()
@@ -60,7 +88,7 @@ func (c *Client) Start(ctx context.Context) error {
 	c.running = true
 	c.mu.Unlock()
 
-	// Get gateway URL from Discord
+	// Get gateway URL and shard count from Discord
 	gatewayInfo, err := c.rest.GetBotGateway(ctx)
 	if err != nil {
 		c.mu.Lock()
@@ -69,7 +97,18 @@ func (c *Client) Start(ctx context.Context) error {
 		return fmt.Errorf("discord: failed to get gateway info: %w", err)
 	}
 
-	_ = gatewayInfo // TODO: use for gateway connection
+	// Connect to gateway with recommended shard count
+	shardCount := int(gatewayInfo.Shards)
+	if shardCount <= 0 {
+		shardCount = 1
+	}
+
+	if err := c.gateway.Connect(ctx, gatewayInfo.URL, shardCount); err != nil {
+		c.mu.Lock()
+		c.running = false
+		c.mu.Unlock()
+		return fmt.Errorf("discord: failed to connect to gateway: %w", err)
+	}
 
 	return nil
 }
@@ -77,15 +116,30 @@ func (c *Client) Start(ctx context.Context) error {
 // Stop gracefully disconnects from the Discord gateway.
 func (c *Client) Stop(ctx context.Context) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if !c.running {
+		c.mu.Unlock()
 		return nil
 	}
+	c.mu.Unlock()
 
+	// Close gateway connection
+	if err := c.gateway.Close(); err != nil {
+		return fmt.Errorf("discord: failed to close gateway: %w", err)
+	}
+
+	// Shutdown event bus
+	if err := c.events.Shutdown(ctx); err != nil {
+		return fmt.Errorf("discord: failed to shutdown event bus: %w", err)
+	}
+
+	// Close worker pool
+	if err := c.worker.Close(ctx); err != nil {
+		return fmt.Errorf("discord: failed to close worker pool: %w", err)
+	}
+
+	c.mu.Lock()
 	c.running = false
-
-	// TODO: close gateway connection
+	c.mu.Unlock()
 
 	return nil
 }
