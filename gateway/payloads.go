@@ -77,21 +77,25 @@ type PresenceUpdate struct {
 
 // Activity represents a user activity.
 type Activity struct {
-	Name string       `json:"name"`           // Activity name
-	Type ActivityType `json:"type"`           // Activity type
-	URL  *string      `json:"url,omitempty"`  // Stream URL (only for Streaming type)
+	Name  string       `json:"name"`            // Activity name (required)
+	Type  ActivityType `json:"type"`            // Activity type
+	URL   *string      `json:"url,omitempty"`   // Stream URL (only for Streaming type)
+	State *string      `json:"state,omitempty"` // Custom status text (only for Custom type, user accounts only)
 }
 
 // ActivityType represents the type of activity.
 type ActivityType int
 
 const (
-	ActivityTypeGame      ActivityType = 0 // Playing {name}
+	ActivityTypePlaying   ActivityType = 0 // Playing {name}
 	ActivityTypeStreaming ActivityType = 1 // Streaming {name}
 	ActivityTypeListening ActivityType = 2 // Listening to {name}
 	ActivityTypeWatching  ActivityType = 3 // Watching {name}
-	ActivityTypeCustom    ActivityType = 4 // Custom status
+	ActivityTypeCustom    ActivityType = 4 // Custom status (user accounts only, not bots)
 	ActivityTypeCompeting ActivityType = 5 // Competing in {name}
+
+	// Aliases for backwards compatibility
+	ActivityTypeGame = ActivityTypePlaying
 )
 
 // RequestGuildMembersData is sent to request guild members.

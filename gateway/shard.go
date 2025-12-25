@@ -349,6 +349,78 @@ func (s *Shard) FatalError() error {
 	return s.fatalError
 }
 
+// UpdatePresence updates the bot's presence/status.
+func (s *Shard) UpdatePresence(ctx context.Context, presence *PresenceUpdate) error {
+	payload, err := MarshalPresenceUpdate(presence)
+	if err != nil {
+		return fmt.Errorf("failed to marshal presence update: %w", err)
+	}
+
+	s.mu.RLock()
+	client := s.client
+	ready := s.ready
+	s.mu.RUnlock()
+
+	if client == nil {
+		return fmt.Errorf("shard not connected")
+	}
+
+	if !ready {
+		return fmt.Errorf("shard not ready")
+	}
+
+	if err := client.Write(ctx, *payload); err != nil {
+		return fmt.Errorf("failed to send presence update: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateVoiceState updates the bot's voice state (join/leave/move voice channels).
+func (s *Shard) UpdateVoiceState(ctx context.Context, data *VoiceStateUpdateData) error {
+	payload, err := MarshalVoiceStateUpdate(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal voice state update: %w", err)
+	}
+
+	s.mu.RLock()
+	client := s.client
+	s.mu.RUnlock()
+
+	if client == nil {
+		return fmt.Errorf("shard not connected")
+	}
+
+	if err := client.Write(ctx, *payload); err != nil {
+		return fmt.Errorf("failed to send voice state update: %w", err)
+	}
+
+	return nil
+}
+
+// RequestGuildMembers requests guild members from Discord.
+// Results are received via GUILD_MEMBERS_CHUNK events.
+func (s *Shard) RequestGuildMembers(ctx context.Context, data *RequestGuildMembersData) error {
+	payload, err := MarshalRequestGuildMembers(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request guild members: %w", err)
+	}
+
+	s.mu.RLock()
+	client := s.client
+	s.mu.RUnlock()
+
+	if client == nil {
+		return fmt.Errorf("shard not connected")
+	}
+
+	if err := client.Write(ctx, *payload); err != nil {
+		return fmt.Errorf("failed to send request guild members: %w", err)
+	}
+
+	return nil
+}
+
 // logIntentInfo logs information about configured intents and any warnings.
 func (s *Shard) logIntentInfo() {
 	log.Printf("[Shard %d] Identifying with intents: %s", s.id, s.intents.String())

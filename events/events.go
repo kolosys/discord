@@ -73,6 +73,58 @@ type MessageCreateEvent struct {
 	Member  *models.GuildMember `json:"member,omitempty"`
 }
 
+// AuthorUser returns the message author as a typed User, or nil if unavailable.
+func (e *MessageCreateEvent) AuthorUser() *models.User {
+	if e.Author == nil {
+		return nil
+	}
+	if u, ok := e.Author.(*models.User); ok {
+		return u
+	}
+	// Handle case where Author is a map (from JSON unmarshaling)
+	if m, ok := e.Author.(map[string]any); ok {
+		user := &models.User{}
+		if id, ok := m["id"].(string); ok {
+			user.ID = id
+		}
+		if username, ok := m["username"].(string); ok {
+			user.Username = username
+		}
+		if discriminator, ok := m["discriminator"].(string); ok {
+			user.Discriminator = discriminator
+		}
+		if bot, ok := m["bot"].(bool); ok {
+			user.Bot = bot
+		}
+		if globalName, ok := m["global_name"].(string); ok {
+			user.GlobalName = &globalName
+		}
+		if avatar, ok := m["avatar"].(string); ok {
+			user.Avatar = &avatar
+		}
+		return user
+	}
+	return nil
+}
+
+// IsBot returns true if the message was sent by a bot.
+func (e *MessageCreateEvent) IsBot() bool {
+	user := e.AuthorUser()
+	return user != nil && user.Bot
+}
+
+// IsSystem returns true if the message was sent by the Discord system.
+func (e *MessageCreateEvent) IsSystem() bool {
+	user := e.AuthorUser()
+	return user != nil && user.System
+}
+
+// IsHuman returns true if the message was sent by a human user (not a bot or system).
+func (e *MessageCreateEvent) IsHuman() bool {
+	user := e.AuthorUser()
+	return user != nil && !user.Bot && !user.System
+}
+
 // MessageUpdateEvent is dispatched when a message is updated.
 type MessageUpdateEvent struct {
 	Base
@@ -158,6 +210,18 @@ type GuildMemberRemoveEvent struct {
 	Base
 	GuildID string       `json:"guild_id"`
 	User    *models.User `json:"user"`
+}
+
+// GuildMembersChunkEvent is dispatched in response to RequestGuildMembers.
+type GuildMembersChunkEvent struct {
+	Base
+	GuildID    string               `json:"guild_id"`
+	Members    []models.GuildMember `json:"members"`
+	ChunkIndex int                  `json:"chunk_index"`
+	ChunkCount int                  `json:"chunk_count"`
+	NotFound   []string             `json:"not_found,omitempty"`
+	Presences  []any                `json:"presences,omitempty"`
+	Nonce      string               `json:"nonce,omitempty"`
 }
 
 // ChannelCreateEvent is dispatched when a channel is created.

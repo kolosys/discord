@@ -23,12 +23,13 @@ func main() {
 	}
 
 	// Create Discord client with intents
-	// Note: IntentMessageContent is a privileged intent that requires enabling in the Discord Developer Portal.
-	// If you need message content, enable it at: https://discord.com/developers/applications → Bot → Privileged Gateway Intents
+	// Privileged intents (GUILD_MEMBERS, GUILD_PRESENCES, MESSAGE_CONTENT) require enabling in Developer Portal:
+	// https://discord.com/developers/applications → Bot → Privileged Gateway Intents
 	client, err := discord.New(&discord.Options{
 		Token: token,
 		Intents: gateway.IntentGuilds |
-			gateway.IntentGuildMessages,
+			gateway.IntentGuildMessages |
+			gateway.IntentMessageContentPrivileged, // Privileged: requires enabling in Developer Portal
 	})
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -42,16 +43,31 @@ func main() {
 		fmt.Printf("Guilds: %d\n", len(e.Guilds))
 		fmt.Printf("Shard ID: %d\n", e.ShardID)
 		fmt.Println("================")
+
+		// Set bot activity - Note: Custom status (type 4) only works for user accounts, not bots
+		// Valid bot activities: Playing, Streaming, Listening, Watching, Competing
+		if err := client.SetActivity(ctx, gateway.ActivityTypeWatching, "for commands"); err != nil {
+			log.Printf("Failed to set activity: %v", err)
+		}
 	})
 
 	// Subscribe to MESSAGE_CREATE event with typed handler
 	client.OnMessageCreate(func(ctx context.Context, e *events.MessageCreateEvent) {
-		// Skip bot messages
-		if e.Author == nil {
+		// Skip bot and system messages
+		if !e.IsHuman() {
 			return
 		}
 
-		fmt.Printf("[MESSAGE] #%s: %s\n", e.ChannelID, e.Content)
+		author := e.AuthorUser()
+		fmt.Printf("[MESSAGE] %s: %s\n", author.Username, e.Content)
+
+		// Echo back messages that start with "!echo "
+		if len(e.Content) > 6 && e.Content[:6] == "!echo " {
+			reply := e.Content[6:]
+			if _, err := client.SendReply(ctx, e.ChannelID, e.ID, reply); err != nil {
+				log.Printf("Failed to send reply: %v", err)
+			}
+		}
 	})
 
 	// Subscribe to GUILD_CREATE event with typed handler

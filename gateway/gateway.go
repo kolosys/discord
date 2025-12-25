@@ -153,3 +153,85 @@ func (g *Gateway) ShardCount() int {
 func (g *Gateway) GetShard(id int) (*Shard, bool) {
 	return g.shards.Get(id)
 }
+
+// UpdatePresence updates the bot's presence on all shards.
+func (g *Gateway) UpdatePresence(ctx context.Context, presence *PresenceUpdate) error {
+	g.mu.RLock()
+	running := g.running
+	g.mu.RUnlock()
+
+	if !running {
+		return fmt.Errorf("gateway not running")
+	}
+
+	shardKeys := g.shards.Keys()
+	for _, shardID := range shardKeys {
+		if shard, ok := g.shards.Get(shardID); ok {
+			if err := shard.UpdatePresence(ctx, presence); err != nil {
+				return fmt.Errorf("shard %d: %w", shardID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// UpdateVoiceState updates the bot's voice state for a specific guild.
+// The request is routed to the shard responsible for that guild.
+func (g *Gateway) UpdateVoiceState(ctx context.Context, data *VoiceStateUpdateData) error {
+	g.mu.RLock()
+	running := g.running
+	g.mu.RUnlock()
+
+	if !running {
+		return fmt.Errorf("gateway not running")
+	}
+
+	shardID := g.shardForGuild(data.GuildID)
+	shard, ok := g.shards.Get(shardID)
+	if !ok {
+		return fmt.Errorf("shard %d not found", shardID)
+	}
+
+	return shard.UpdateVoiceState(ctx, data)
+}
+
+// RequestGuildMembers requests guild members for a specific guild.
+// The request is routed to the shard responsible for that guild.
+// Results are received via GUILD_MEMBERS_CHUNK events.
+func (g *Gateway) RequestGuildMembers(ctx context.Context, data *RequestGuildMembersData) error {
+	g.mu.RLock()
+	running := g.running
+	g.mu.RUnlock()
+
+	if !running {
+		return fmt.Errorf("gateway not running")
+	}
+
+	shardID := g.shardForGuild(data.GuildID)
+	shard, ok := g.shards.Get(shardID)
+	if !ok {
+		return fmt.Errorf("shard %d not found", shardID)
+	}
+
+	return shard.RequestGuildMembers(ctx, data)
+}
+
+// shardForGuild calculates which shard handles a given guild.
+// Formula: (guild_id >> 22) % num_shards
+func (g *Gateway) shardForGuild(guildID string) int {
+	shardCount := g.shards.Size()
+	if shardCount <= 1 {
+		return 0
+	}
+
+	// Parse guild ID as uint64 and apply Discord's sharding formula
+	var id uint64
+	for _, c := range guildID {
+		if c >= '0' && c <= '9' {
+			id = id*10 + uint64(c-'0')
+		}
+	}
+
+	return int((id >> 22) % uint64(shardCount))
+}
