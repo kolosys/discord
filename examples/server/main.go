@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +14,7 @@ import (
 	"github.com/kolosys/discord/events"
 	"github.com/kolosys/discord/examples/internal"
 	"github.com/kolosys/discord/gateway"
+	"github.com/kolosys/helix"
 )
 
 func main() {
@@ -22,31 +25,69 @@ func main() {
 		log.Fatal("DISCORD_TOKEN environment variable is required")
 	}
 
-	// Create Discord bot (gateway only, no HTTP server)
+	// Create Discord bot with HTTP server
 	bot, err := discord.New(&discord.Options{
 		Token: token,
 		Intents: gateway.IntentGuilds |
 			gateway.IntentGuildMessages |
 			gateway.IntentMessageContentPrivileged,
+		Addr: ":8080", // Enable HTTP server
 	})
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
 
-	// Subscribe to READY event
+	// === HTTP Routes ===
+
+	bot.GET("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "ok",
+			"gateway": bot.Gateway().IsReady(),
+			"shards":  bot.Gateway().ShardCount(),
+		})
+	})
+
+	bot.GET("/api/info", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"running": bot.IsRunning(),
+			"shards":  bot.Gateway().ShardCount(),
+		})
+	})
+
+	bot.POST("/api/channels/{channelID}/messages", func(w http.ResponseWriter, r *http.Request) {
+		channelID := r.PathValue("channelID")
+
+		var req struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			helix.WriteProblem(w, helix.ErrBadRequest)
+			return
+		}
+
+		msg, err := bot.SendMessage(r.Context(), channelID, req.Content)
+		if err != nil {
+			helix.WriteProblem(w, helix.NewProblem(http.StatusBadGateway, "discord_error", err.Error()))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(msg)
+	})
+
+	// === Discord Gateway Events ===
+
 	bot.OnReady(func(ctx context.Context, e *events.ReadyEvent) {
 		fmt.Println("\n=== BOT READY ===")
 		fmt.Printf("User: %s#%s\n", e.User.Username, e.User.Discriminator)
-		fmt.Printf("Session ID: %s\n", e.SessionID)
 		fmt.Printf("Guilds: %d\n", len(e.Guilds))
-		fmt.Printf("Shard ID: %d\n", e.ShardID)
 		fmt.Println("================")
 
-		// Set bot activity
 		bot.SetActivity(ctx, gateway.ActivityTypeWatching, "for commands")
 	})
 
-	// Subscribe to MESSAGE_CREATE event
 	bot.OnMessageCreate(func(ctx context.Context, e *events.MessageCreateEvent) {
 		if !e.IsHuman() {
 			return
@@ -55,27 +96,27 @@ func main() {
 		author := e.AuthorUser()
 		fmt.Printf("[MESSAGE] %s: %s\n", author.Username, e.Content)
 
-		// Echo command
-		if len(e.Content) > 6 && e.Content[:6] == "!echo " {
-			reply := e.Content[6:]
-			if _, err := bot.SendReply(ctx, e.ChannelID, e.ID, reply); err != nil {
-				log.Printf("Failed to send reply: %v", err)
-			}
+		if e.Content == "!ping" {
+			bot.SendReply(ctx, e.ChannelID, e.ID, "Pong! 🏓")
 		}
 	})
 
-	// Subscribe to GUILD_CREATE event
 	bot.OnGuildCreate(func(ctx context.Context, e *events.GuildCreateEvent) {
 		fmt.Printf("[GUILD] %s (%d members)\n", e.Name, e.MemberCount)
 	})
 
-	// Start the bot
+	// === Start Bot ===
+
 	ctx := context.Background()
 	if err := bot.Start(ctx); err != nil {
 		log.Fatalf("Failed to start bot: %v", err)
 	}
 
-	fmt.Println("Bot is running. Press Ctrl+C to exit.")
+	fmt.Println("\nBot running:")
+	fmt.Println("  - Discord Gateway: connected")
+	fmt.Println("  - HTTP Server: http://localhost:8080")
+	fmt.Println("  - Health: http://localhost:8080/health")
+	fmt.Println("\nPress Ctrl+C to exit.")
 
 	// Wait for interrupt
 	stop := make(chan os.Signal, 1)
