@@ -81,3 +81,90 @@ func (i Intent) Add(intent Intent) Intent {
 func (i Intent) Remove(intent Intent) Intent {
 	return i &^ intent
 }
+
+// PrivilegedIntents returns which privileged intents are included.
+func (i Intent) PrivilegedIntents() []string {
+	var privileged []string
+	if i.Has(IntentGuildMembers) {
+		privileged = append(privileged, "GUILD_MEMBERS")
+	}
+	if i.Has(IntentGuildPresences) {
+		privileged = append(privileged, "GUILD_PRESENCES")
+	}
+	if i.Has(IntentMessageContent) {
+		privileged = append(privileged, "MESSAGE_CONTENT")
+	}
+	return privileged
+}
+
+// Warnings returns helpful warnings about the intent configuration.
+func (i Intent) Warnings() []string {
+	var warnings []string
+
+	// Check for message-related intents without MESSAGE_CONTENT
+	hasMessageIntent := i.Has(IntentGuildMessages) || i.Has(IntentDirectMessages)
+	if hasMessageIntent && !i.Has(IntentMessageContent) {
+		warnings = append(warnings,
+			"MESSAGE_CONTENT intent not enabled - message content, embeds, attachments, and components will be empty. "+
+				"Enable in Discord Developer Portal if needed: https://discord.com/developers/applications")
+	}
+
+	// Check for reaction intents without message intents
+	if i.Has(IntentGuildMessageReactions) && !i.Has(IntentGuildMessages) {
+		warnings = append(warnings,
+			"GUILD_MESSAGE_REACTIONS enabled without GUILD_MESSAGES - you won't receive the original message context")
+	}
+
+	return warnings
+}
+
+// String returns a human-readable list of enabled intents.
+func (i Intent) String() string {
+	var intents []string
+
+	intentMap := map[Intent]string{
+		IntentGuilds:                      "GUILDS",
+		IntentGuildMembers:                "GUILD_MEMBERS",
+		IntentGuildModeration:             "GUILD_MODERATION",
+		IntentGuildEmojisAndStickers:      "GUILD_EMOJIS_AND_STICKERS",
+		IntentGuildIntegrations:           "GUILD_INTEGRATIONS",
+		IntentGuildWebhooks:               "GUILD_WEBHOOKS",
+		IntentGuildInvites:                "GUILD_INVITES",
+		IntentGuildVoiceStates:            "GUILD_VOICE_STATES",
+		IntentGuildPresences:              "GUILD_PRESENCES",
+		IntentGuildMessages:               "GUILD_MESSAGES",
+		IntentGuildMessageReactions:       "GUILD_MESSAGE_REACTIONS",
+		IntentGuildMessageTyping:          "GUILD_MESSAGE_TYPING",
+		IntentDirectMessages:              "DIRECT_MESSAGES",
+		IntentDirectMessageReactions:      "DIRECT_MESSAGE_REACTIONS",
+		IntentDirectMessageTyping:         "DIRECT_MESSAGE_TYPING",
+		IntentMessageContent:              "MESSAGE_CONTENT",
+		IntentGuildScheduledEvents:        "GUILD_SCHEDULED_EVENTS",
+		IntentAutoModerationConfiguration: "AUTO_MODERATION_CONFIGURATION",
+		IntentAutoModerationExecution:     "AUTO_MODERATION_EXECUTION",
+		IntentGuildMessagePolls:           "GUILD_MESSAGE_POLLS",
+		IntentDirectMessagePolls:          "DIRECT_MESSAGE_POLLS",
+	}
+
+	for intent, name := range intentMap {
+		if i.Has(intent) {
+			intents = append(intents, name)
+		}
+	}
+
+	if len(intents) == 0 {
+		return "none"
+	}
+	return join(intents, ", ")
+}
+
+func join(s []string, sep string) string {
+	if len(s) == 0 {
+		return ""
+	}
+	result := s[0]
+	for _, v := range s[1:] {
+		result += sep + v
+	}
+	return result
+}

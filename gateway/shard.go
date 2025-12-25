@@ -133,7 +133,7 @@ func (s *Shard) handleHello(payload GatewayPayload) {
 		log.Printf("[Shard %d] Resuming session %s", s.id, s.session.SessionID())
 		s.sendResume()
 	} else {
-		log.Printf("[Shard %d] Identifying with intents %d", s.id, s.intents)
+		s.logIntentInfo()
 		s.sendIdentify()
 	}
 }
@@ -347,6 +347,22 @@ func (s *Shard) FatalError() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.fatalError
+}
+
+// logIntentInfo logs information about configured intents and any warnings.
+func (s *Shard) logIntentInfo() {
+	log.Printf("[Shard %d] Identifying with intents: %s", s.id, s.intents.String())
+
+	// Log privileged intents if any are requested
+	if privileged := s.intents.PrivilegedIntents(); len(privileged) > 0 {
+		log.Printf("[Shard %d] Privileged intents requested: %v", s.id, privileged)
+		log.Printf("[Shard %d] Ensure these are enabled in Discord Developer Portal", s.id)
+	}
+
+	// Log any configuration warnings
+	for _, warning := range s.intents.Warnings() {
+		log.Printf("[Shard %d] WARNING: %s", s.id, warning)
+	}
 }
 
 // Close gracefully closes the shard connection.
