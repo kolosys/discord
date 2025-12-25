@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -10,13 +9,12 @@ import (
 	"syscall"
 
 	"github.com/kolosys/discord"
+	"github.com/kolosys/discord/events"
 	"github.com/kolosys/discord/examples/internal"
 	"github.com/kolosys/discord/gateway"
-	"github.com/kolosys/nova/shared"
 )
 
 func main() {
-	// Load environment variables
 	internal.LoadEnv(".env")
 
 	token := os.Getenv("DISCORD_TOKEN")
@@ -36,45 +34,34 @@ func main() {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	// Subscribe to READY event
-	client.Events().Subscribe("READY", &EventListener{
-		id: "ready-listener",
-		handler: func(event shared.Event) error {
-			fmt.Println("\n=== BOT READY ===")
-
-			// Parse READY data
-			var ready gateway.ReadyData
-			if err := json.Unmarshal(event.Data().(json.RawMessage), &ready); err != nil {
-				return fmt.Errorf("failed to unmarshal READY: %w", err)
-			}
-
-			fmt.Printf("User: %s#%s\n", ready.User.Username, ready.User.Discriminator)
-			fmt.Printf("Session ID: %s\n", ready.SessionID)
-			fmt.Printf("Guilds: %d\n", len(ready.Guilds))
-			fmt.Println("================")
-
-			return nil
-		},
+	// Subscribe to READY event with typed handler
+	client.OnReady(func(ctx context.Context, e *events.ReadyEvent) {
+		fmt.Println("\n=== BOT READY ===")
+		fmt.Printf("User: %s#%s\n", e.User.Username, e.User.Discriminator)
+		fmt.Printf("Session ID: %s\n", e.SessionID)
+		fmt.Printf("Guilds: %d\n", len(e.Guilds))
+		fmt.Printf("Shard ID: %d\n", e.ShardID)
+		fmt.Println("================")
 	})
 
-	// Subscribe to MESSAGE_CREATE event
-	client.Events().Subscribe("MESSAGE_CREATE", &EventListener{
-		id: "message-listener",
-		handler: func(event shared.Event) error {
-			// You can unmarshal the event data to the appropriate Discord model
-			// For now, just log that we received a message
-			fmt.Printf("[MESSAGE_CREATE] Received message event\n")
-			return nil
-		},
+	// Subscribe to MESSAGE_CREATE event with typed handler
+	client.OnMessageCreate(func(ctx context.Context, e *events.MessageCreateEvent) {
+		// Skip bot messages
+		if e.Author == nil {
+			return
+		}
+
+		fmt.Printf("[MESSAGE] #%s: %s\n", e.ChannelID, e.Content)
 	})
 
-	// Subscribe to GUILD_CREATE event
-	client.Events().Subscribe("GUILD_CREATE", &EventListener{
-		id: "guild-listener",
-		handler: func(event shared.Event) error {
-			fmt.Printf("[GUILD_CREATE] Guild became available\n")
-			return nil
-		},
+	// Subscribe to GUILD_CREATE event with typed handler
+	client.OnGuildCreate(func(ctx context.Context, e *events.GuildCreateEvent) {
+		fmt.Printf("[GUILD] %s (%d members)\n", e.Name, e.MemberCount)
+	})
+
+	// Subscribe to GUILD_MEMBER_ADD event with typed handler
+	client.OnGuildMemberAdd(func(ctx context.Context, e *events.GuildMemberAddEvent) {
+		fmt.Printf("[MEMBER+] New member joined guild %s\n", e.GuildID)
 	})
 
 	// Start the client
@@ -96,23 +83,4 @@ func main() {
 	}
 
 	fmt.Println("Goodbye!")
-}
-
-// EventListener implements the shared.Listener interface.
-type EventListener struct {
-	id      string
-	handler func(shared.Event) error
-}
-
-func (l *EventListener) ID() string {
-	return l.id
-}
-
-func (l *EventListener) Handle(event shared.Event) error {
-	return l.handler(event)
-}
-
-func (l *EventListener) OnError(event shared.Event, err error) error {
-	log.Printf("[%s] Error handling event %s: %v", l.id, event.Type(), err)
-	return nil
 }
