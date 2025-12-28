@@ -15,21 +15,19 @@ import (
 	"github.com/kolosys/discord/models"
 )
 
-// commandRouter is the integrated command router.
-var commandRouter *commands.Router
-
 // Commands returns the command router for registering commands.
+// The router is initialized lazily and sets up the interaction handler on first access.
 func (b *Bot) Commands() *commands.Router {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if commandRouter == nil {
-		commandRouter = commands.NewRouter()
-		commandRouter.SetResponder(b)
+	// Initialize router responder and handler on first access
+	if b.router != nil && b.router.Responder() == nil {
+		b.router.SetResponder(b)
 		b.setupInteractionHandler()
 	}
 
-	return commandRouter
+	return b.router
 }
 
 // appID returns the application ID.
@@ -42,8 +40,8 @@ func (b *Bot) SetApplicationID(id string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.applicationID = id
-	if commandRouter != nil {
-		commandRouter.SetSyncer(b, id)
+	if b.router != nil {
+		b.router.SetSyncer(b, id)
 	}
 }
 
@@ -76,7 +74,7 @@ func (b *Bot) setupInteractionHandler() {
 			b.SetApplicationID(interaction.ApplicationID)
 		}
 
-		if err := commandRouter.HandleInteraction(ctx, &interaction); err != nil {
+		if err := b.router.HandleInteraction(ctx, &interaction); err != nil {
 			log.Printf("discord: failed to handle interaction: %v", err)
 		}
 	})

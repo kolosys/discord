@@ -69,6 +69,13 @@ func (r *Router) SetResponder(responder Responder) {
 	r.responder = responder
 }
 
+// Responder returns the current responder, or nil if not set.
+func (r *Router) Responder() Responder {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.responder
+}
+
 // Command registers a command.
 func (r *Router) Command(cmd Command) {
 	r.mu.Lock()

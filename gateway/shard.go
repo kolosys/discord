@@ -25,6 +25,7 @@ type Shard struct {
 	token   string
 	intents Intent
 
+	ctx        context.Context // Parent context for operations
 	mu         sync.RWMutex
 	ready      bool
 	fatalError error // Non-nil if a fatal error occurred
@@ -48,6 +49,11 @@ func NewShard(id, total int, token string, intents Intent, events bus.EventBus) 
 
 // Connect establishes a WebSocket connection to the gateway.
 func (s *Shard) Connect(ctx context.Context, url string) error {
+	// Store parent context for use in handlers
+	s.mu.Lock()
+	s.ctx = ctx
+	s.mu.Unlock()
+
 	// Add gateway version and encoding parameters
 	gatewayURL := fmt.Sprintf("%s?v=10&encoding=json", url)
 
@@ -133,6 +139,17 @@ func (s *Shard) handlePayload(payload GatewayPayload) {
 	}
 }
 
+// getContext returns the shard's parent context, or a background context if none is set.
+func (s *Shard) getContext() context.Context {
+	s.mu.RLock()
+	ctx := s.ctx
+	s.mu.RUnlock()
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
+}
+
 // handleHello processes the Hello opcode and starts the heartbeat.
 func (s *Shard) handleHello(payload GatewayPayload) {
 	var hello HelloData
@@ -143,9 +160,9 @@ func (s *Shard) handleHello(payload GatewayPayload) {
 
 	log.Printf("[Shard %d] Received Hello, heartbeat interval: %dms", s.id, hello.HeartbeatInterval)
 
-	// Start heartbeat
+	// Start heartbeat with parent context
 	interval := time.Duration(hello.HeartbeatInterval) * time.Millisecond
-	err := s.hb.Start(interval, s.sendHeartbeat)
+	err := s.hb.Start(s.getContext(), interval, s.sendHeartbeat)
 	if err != nil {
 		log.Printf("[Shard %d] Failed to start heartbeat: %v", s.id, err)
 		return
@@ -215,8 +232,7 @@ func (s *Shard) handleDispatch(payload GatewayPayload) {
 		log.Printf("[Shard %d] Publishing INTERACTION_CREATE event", s.id)
 	}
 
-	ctx := context.Background()
-	if err := s.events.Publish(ctx, eventName, event); err != nil {
+	if err := s.events.Publish(s.getContext(), eventName, event); err != nil {
 		log.Printf("[Shard %d] Failed to publish event %s: %v", s.id, eventName, err)
 	}
 }
@@ -254,8 +270,7 @@ func (s *Shard) handleReady(payload GatewayPayload) {
 	)
 	event.SetMetadata("shard_id", fmt.Sprintf("%d", s.id))
 
-	ctx := context.Background()
-	if err := s.events.Publish(ctx, "READY", event); err != nil {
+	if err := s.events.Publish(s.getContext(), "READY", event); err != nil {
 		log.Printf("[Shard %d] Failed to publish READY event: %v", s.id, err)
 	}
 }
@@ -272,8 +287,7 @@ func (s *Shard) sendIdentify() error {
 		return fmt.Errorf("failed to marshal identify: %w", err)
 	}
 
-	ctx := context.Background()
-	if err := s.client.Write(ctx, *payload); err != nil {
+	if err := s.client.Write(s.getContext(), *payload); err != nil {
 		return fmt.Errorf("failed to send identify: %w", err)
 	}
 
@@ -291,8 +305,7 @@ func (s *Shard) sendResume() error {
 		return fmt.Errorf("failed to marshal resume: %w", err)
 	}
 
-	ctx := context.Background()
-	if err := s.client.Write(ctx, *payload); err != nil {
+	if err := s.client.Write(s.getContext(), *payload); err != nil {
 		return fmt.Errorf("failed to send resume: %w", err)
 	}
 
@@ -307,8 +320,7 @@ func (s *Shard) sendHeartbeat(seq int) error {
 		return fmt.Errorf("failed to marshal heartbeat: %w", err)
 	}
 
-	ctx := context.Background()
-	if err := s.client.Write(ctx, *payload); err != nil {
+	if err := s.client.Write(s.getContext(), *payload); err != nil {
 		return fmt.Errorf("failed to send heartbeat: %w", err)
 	}
 

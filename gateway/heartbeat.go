@@ -31,9 +31,10 @@ func NewHeartbeatManager(session *Session) *HeartbeatManager {
 }
 
 // Start begins the heartbeat loop.
-// interval is in milliseconds.
+// parent is the parent context for cancellation propagation.
+// interval is the heartbeat interval.
 // sendFunc is called to send the heartbeat payload.
-func (h *HeartbeatManager) Start(interval time.Duration, sendFunc func(seq int) error) error {
+func (h *HeartbeatManager) Start(parent context.Context, interval time.Duration, sendFunc func(seq int) error) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -48,7 +49,8 @@ func (h *HeartbeatManager) Start(interval time.Duration, sendFunc func(seq int) 
 	now := time.Now().UnixMilli()
 	h.lastACK.Store(now)
 
-	h.ctx, h.cancel = context.WithCancel(context.Background())
+	// Use parent context for cancellation propagation
+	h.ctx, h.cancel = context.WithCancel(parent)
 
 	h.wg.Add(1)
 	go h.heartbeatLoop(sendFunc)

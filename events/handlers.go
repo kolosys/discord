@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -38,10 +39,10 @@ var listenerID atomic.Uint64
 // eventListener implements shared.Listener for event handling.
 type eventListener struct {
 	id      string
-	handler func(shared.Event) error
+	handler func(ctx context.Context, event shared.Event) error
 }
 
-func newEventListener(handler func(shared.Event) error) *eventListener {
+func newEventListener(handler func(ctx context.Context, event shared.Event) error) *eventListener {
 	id := listenerID.Add(1)
 	return &eventListener{
 		id:      fmt.Sprintf("discord-listener-%d", id),
@@ -49,14 +50,17 @@ func newEventListener(handler func(shared.Event) error) *eventListener {
 	}
 }
 
-func (l *eventListener) ID() string                                  { return l.id }
-func (l *eventListener) Handle(event shared.Event) error             { return l.handler(event) }
-func (l *eventListener) OnError(event shared.Event, err error) error { return nil }
+func (l *eventListener) ID() string { return l.id }
+func (l *eventListener) Handle(ctx context.Context, event shared.Event) error {
+	return l.handler(ctx, event)
+}
+func (l *eventListener) OnError(_ context.Context, _ shared.Event, _ error) error { return nil }
 
 // On registers a type-safe handler for a specific event type.
 // The handler will receive the event data already deserialized into the correct type.
+// Context is propagated from the event bus for cancellation and deadline support.
 func On[T any](d *Dispatcher, eventType Type, handler Handler[T]) error {
-	listener := newEventListener(func(e shared.Event) error {
+	listener := newEventListener(func(ctx context.Context, e shared.Event) error {
 		raw, ok := e.Data().(json.RawMessage)
 		if !ok {
 			return fmt.Errorf("invalid event data type: expected json.RawMessage, got %T", e.Data())
@@ -71,7 +75,7 @@ func On[T any](d *Dispatcher, eventType Type, handler Handler[T]) error {
 			setShardID(&event, shardID)
 		}
 
-		handler(context.Background(), &event)
+		handler(ctx, &event)
 		return nil
 	})
 
@@ -86,13 +90,14 @@ func On[T any](d *Dispatcher, eventType Type, handler Handler[T]) error {
 
 // OnRaw registers a handler that receives raw event data.
 // Useful for custom event processing or debugging.
+// Context is propagated from the event bus for cancellation and deadline support.
 func (d *Dispatcher) OnRaw(eventType Type, handler RawHandler) error {
-	listener := newEventListener(func(e shared.Event) error {
+	listener := newEventListener(func(ctx context.Context, e shared.Event) error {
 		raw, ok := e.Data().(json.RawMessage)
 		if !ok {
 			return fmt.Errorf("invalid event data type: expected json.RawMessage, got %T", e.Data())
 		}
-		handler(context.Background(), eventType, raw)
+		handler(ctx, eventType, raw)
 		return nil
 	})
 
@@ -106,14 +111,15 @@ func (d *Dispatcher) OnRaw(eventType Type, handler RawHandler) error {
 }
 
 // OnAny registers a handler for all events using pattern matching.
+// Context is propagated from the event bus for cancellation and deadline support.
 func (d *Dispatcher) OnAny(handler RawHandler) error {
-	listener := newEventListener(func(e shared.Event) error {
+	listener := newEventListener(func(ctx context.Context, e shared.Event) error {
 		raw, ok := e.Data().(json.RawMessage)
 		if !ok {
 			return nil // Skip non-JSON events
 		}
 		eventType := Type(e.Type())
-		handler(context.Background(), eventType, raw)
+		handler(ctx, eventType, raw)
 		return nil
 	})
 
@@ -150,8 +156,7 @@ type shardAware interface {
 // setShardID sets the shard ID on events that implement shardAware.
 func setShardID(event any, shardID string) {
 	if sa, ok := event.(shardAware); ok {
-		var id int
-		_, _ = fmt.Sscanf(shardID, "%d", &id)
+		id, _ := strconv.Atoi(shardID)
 		sa.setShardID(id)
 	}
 }

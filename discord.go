@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/kolosys/discord/commands"
 	"github.com/kolosys/discord/events"
 	"github.com/kolosys/discord/gateway"
 	"github.com/kolosys/discord/rest"
@@ -39,6 +40,7 @@ type Bot struct {
 	events        bus.EventBus
 	dispatcher    *events.Dispatcher
 	worker        *workerpool.Pool
+	router        *commands.Router // Per-instance command router
 
 	httpEnabled bool
 	mu          sync.RWMutex
@@ -98,6 +100,7 @@ func New(opts *Options) (*Bot, error) {
 		events:     eventBus,
 		dispatcher: dispatcher,
 		worker:     worker,
+		router:     commands.NewRouter(),
 	}
 
 	// Create HTTP server if address is specified
