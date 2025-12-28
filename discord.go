@@ -14,6 +14,17 @@ import (
 	"github.com/kolosys/nova/bus"
 )
 
+const discord_banner = `
+    ____  _                          __
+   / __ \(_)_____________  _________/ /
+  / / / / / ___/ ___/ __ \/ ___/ __  / 
+ / /_/ / (__  ) /__/ /_/ / /  / /_/ /  
+/_____/_/____/\___/\____/_/   \__,_/   
+Discord for Go (kolosys/discord, v0.1.0)
+Developer friendly Discord SDK using (helix v{version})
+_________________________________________  
+`
+
 // Bot is a unified Discord bot that combines:
 // - Discord Gateway (real-time events via WebSocket)
 // - Discord REST client (API calls)
@@ -21,12 +32,13 @@ import (
 type Bot struct {
 	*helix.Server // Embedded Helix server (nil if HTTP disabled)
 
-	token      string
-	rest       *rest.REST
-	gateway    *gateway.Gateway
-	events     bus.EventBus
-	dispatcher *events.Dispatcher
-	worker     *workerpool.Pool
+	token         string
+	applicationID string
+	rest          *rest.REST
+	gateway       *gateway.Gateway
+	events        bus.EventBus
+	dispatcher    *events.Dispatcher
+	worker        *workerpool.Pool
 
 	httpEnabled bool
 	mu          sync.RWMutex
@@ -98,6 +110,14 @@ func New(opts *Options) (*Bot, error) {
 		if opts.BasePath != "" {
 			helixOpts.BasePath = opts.BasePath
 		}
+
+		// Setup Discord SDK banner
+		helixOpts.Banner = discord_banner
+		helixOpts.HideBanner = false
+
+		helixOpts.AutoPort = true
+		helixOpts.MaxPortAttempts = 10
+
 		bot.Server = helix.Default(helixOpts)
 		bot.httpEnabled = true
 	}
@@ -134,6 +154,16 @@ func (b *Bot) Start(ctx context.Context) error {
 	}
 	b.running = true
 	b.mu.Unlock()
+
+	// Get current user to set application ID (for bots, user ID = application ID)
+	user, err := b.rest.GetCurrentUser(ctx)
+	if err != nil {
+		b.mu.Lock()
+		b.running = false
+		b.mu.Unlock()
+		return fmt.Errorf("discord: failed to get current user: %w", err)
+	}
+	b.SetApplicationID(user.ID)
 
 	// Get gateway URL and shard count from Discord
 	gatewayInfo, err := b.rest.GetBotGateway(ctx)

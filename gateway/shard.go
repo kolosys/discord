@@ -54,9 +54,32 @@ func (s *Shard) Connect(ctx context.Context, url string) error {
 	// Create axon client options
 	opts := axon.DefaultClientOptions()
 	opts.Reconnect.Enabled = true
-	opts.Reconnect.MaxAttempts = 5
+	opts.Reconnect.MaxAttempts = 0 // Unlimited reconnection attempts
 	opts.Reconnect.InitialDelay = 1 * time.Second
 	opts.Reconnect.MaxDelay = 120 * time.Second
+	opts.Reconnect.OnReconnecting = func(attempt int, delay time.Duration) {
+		log.Printf("[Shard %d] Reconnecting (attempt %d, delay %s)...", s.id, attempt, delay)
+	}
+	opts.Reconnect.OnReconnected = func(attempt int) {
+		log.Printf("[Shard %d] Reconnected after %d attempt(s)", s.id, attempt)
+	}
+	opts.Reconnect.OnReconnectFailed = func(attempt int, err error) {
+		log.Printf("[Shard %d] Reconnect attempt %d failed: %v", s.id, attempt, err)
+	}
+	// Custom reconnection logic for Discord gateway
+	// Discord close code 1000 should trigger reconnection (unlike standard WebSocket behavior)
+	opts.Reconnect.ShouldReconnect = func(err error, attempt int) bool {
+		closeErr := axon.AsCloseError(err)
+		if closeErr == nil {
+			return true // Network errors should always reconnect
+		}
+		// Check Discord-specific close codes
+		code := CloseCode(closeErr.Code)
+		if code.IsFatal() {
+			return false // Don't reconnect for fatal Discord errors
+		}
+		return true // Reconnect for everything else including 1000
+	}
 
 	// Discord heartbeat interval is ~41.25 seconds, set read deadline longer to avoid timeout
 	opts.ReadDeadline = 90 * time.Second
@@ -187,6 +210,10 @@ func (s *Shard) handleDispatch(payload GatewayPayload) {
 		payload.D,
 	)
 	event.SetMetadata("shard_id", fmt.Sprintf("%d", s.id))
+
+	if eventName == "INTERACTION_CREATE" {
+		log.Printf("[Shard %d] Publishing INTERACTION_CREATE event", s.id)
+	}
 
 	ctx := context.Background()
 	if err := s.events.Publish(ctx, eventName, event); err != nil {

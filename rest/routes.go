@@ -196,3 +196,82 @@ func (r *REST) ListGuildMembers(ctx context.Context, guildID string) ([]models.G
 	}
 	return resp.Data, nil
 }
+
+// Interaction endpoints
+
+// CreateInteractionResponse responds to an interaction.
+func (r *REST) CreateInteractionResponse(ctx context.Context, interactionID, token string, response any) error {
+	if err := r.wait(ctx, "POST", "/interactions/"+interactionID+"/callback"); err != nil {
+		return err
+	}
+	_, err := r.client.CreateInteractionResponse(ctx, models.SnowflakeType(interactionID), token, response)
+	if err != nil {
+		return fmt.Errorf("create interaction response: %w", err)
+	}
+	return nil
+}
+
+// EditOriginalInteractionResponse edits the original interaction response.
+func (r *REST) EditOriginalInteractionResponse(ctx context.Context, appID, token string, edit *models.IncomingWebhookUpdateOptionsPartial) (*models.Message, error) {
+	if err := r.wait(ctx, "PATCH", "/webhooks/"+appID+"/"+token+"/messages/@original"); err != nil {
+		return nil, err
+	}
+	if edit == nil {
+		edit = &models.IncomingWebhookUpdateOptionsPartial{}
+	}
+	resp, err := r.client.UpdateOriginalWebhookMessage(ctx, models.SnowflakeType(appID), token, *edit)
+	if err != nil {
+		return nil, fmt.Errorf("edit original interaction response: %w", err)
+	}
+	return &resp.Data, nil
+}
+
+// DeleteOriginalInteractionResponse deletes the original interaction response.
+func (r *REST) DeleteOriginalInteractionResponse(ctx context.Context, appID, token string) error {
+	if err := r.wait(ctx, "DELETE", "/webhooks/"+appID+"/"+token+"/messages/@original"); err != nil {
+		return err
+	}
+	_, err := r.client.DeleteOriginalWebhookMessage(ctx, models.SnowflakeType(appID), token)
+	if err != nil {
+		return fmt.Errorf("delete original interaction response: %w", err)
+	}
+	return nil
+}
+
+// CreateFollowupMessage creates a followup message for an interaction.
+func (r *REST) CreateFollowupMessage(ctx context.Context, appID, token string, message any) (*models.Message, error) {
+	if err := r.wait(ctx, "POST", "/webhooks/"+appID+"/"+token); err != nil {
+		return nil, err
+	}
+	resp, err := r.client.ExecuteWebhook(ctx, models.SnowflakeType(appID), token, message)
+	if err != nil {
+		return nil, fmt.Errorf("create followup message: %w", err)
+	}
+	return &resp.Data, nil
+}
+
+// Application command endpoints
+
+// BulkOverwriteGlobalCommands replaces all global application commands.
+func (r *REST) BulkOverwriteGlobalCommands(ctx context.Context, appID string, commands any) ([]models.ApplicationCommand, error) {
+	if err := r.wait(ctx, "PUT", "/applications/"+appID+"/commands"); err != nil {
+		return nil, err
+	}
+	resp, err := r.client.BulkSetApplicationCommands(ctx, models.SnowflakeType(appID), commands)
+	if err != nil {
+		return nil, fmt.Errorf("bulk overwrite global commands: %w", err)
+	}
+	return resp.Data, nil
+}
+
+// BulkOverwriteGuildCommands replaces all guild application commands.
+func (r *REST) BulkOverwriteGuildCommands(ctx context.Context, appID, guildID string, commands any) ([]models.ApplicationCommand, error) {
+	if err := r.wait(ctx, "PUT", "/applications/"+appID+"/guilds/"+guildID+"/commands"); err != nil {
+		return nil, err
+	}
+	resp, err := r.client.BulkSetGuildApplicationCommands(ctx, models.SnowflakeType(appID), models.SnowflakeType(guildID), commands)
+	if err != nil {
+		return nil, fmt.Errorf("bulk overwrite guild commands: %w", err)
+	}
+	return resp.Data, nil
+}
