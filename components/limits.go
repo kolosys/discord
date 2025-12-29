@@ -106,4 +106,3 @@ func ValidateModalInputCount(count int) error {
 	}
 	return nil
 }
-

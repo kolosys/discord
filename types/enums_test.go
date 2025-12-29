@@ -101,11 +101,11 @@ func TestChannelType_IsGuild(t *testing.T) {
 
 func TestChannelType_Combinations(t *testing.T) {
 	tests := []struct {
-		name              string
-		channelType       types.ChannelType
-		shouldBeThread    bool
-		shouldBeVoice     bool
-		shouldBeGuild     bool
+		name           string
+		channelType    types.ChannelType
+		shouldBeThread bool
+		shouldBeVoice  bool
+		shouldBeGuild  bool
 	}{
 		{"Announcement thread", types.ChannelTypeAnnouncementThread, true, false, true},
 		{"Public thread", types.ChannelTypePublicThread, true, false, true},

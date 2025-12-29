@@ -39,12 +39,12 @@ func TestMessageCreateEvent_AuthorUser_Direct(t *testing.T) {
 
 func TestMessageCreateEvent_AuthorUser_FromMap(t *testing.T) {
 	authorMap := map[string]any{
-		"id":        "456",
-		"username":  "mapuser",
-		"bot":       true,
-		"system":    false,
-		"avatar":    "abcdef",
-		"global_name": "Map User",
+		"id":            "456",
+		"username":      "mapuser",
+		"bot":           true,
+		"system":        false,
+		"avatar":        "abcdef",
+		"global_name":   "Map User",
 		"discriminator": "0001",
 	}
 
@@ -270,10 +270,10 @@ func TestMessageCreateEvent_MapAuthor_PartialFields(t *testing.T) {
 
 func TestMessageCreateEvent_Combinations(t *testing.T) {
 	tests := []struct {
-		name     string
-		user     *models.User
-		wantBot  bool
-		wantSys  bool
+		name      string
+		user      *models.User
+		wantBot   bool
+		wantSys   bool
 		wantHuman bool
 	}{
 		{

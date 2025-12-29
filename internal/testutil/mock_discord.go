@@ -11,14 +11,14 @@ import (
 
 // MockDiscord provides a mock HTTP server for Discord REST API testing.
 type MockDiscord struct {
-	server      *http.Server
-	listener    net.Listener
-	addr        string
-	mu          sync.RWMutex
-	handlers    map[string]Handler
-	requests    []*ReceivedRequest
-	requestsMu  sync.Mutex
-	closed      atomic.Bool
+	server     *http.Server
+	listener   net.Listener
+	addr       string
+	mu         sync.RWMutex
+	handlers   map[string]Handler
+	requests   []*ReceivedRequest
+	requestsMu sync.Mutex
+	closed     atomic.Bool
 }
 
 // Handler processes a mock HTTP request.
@@ -172,8 +172,8 @@ func (md *MockDiscord) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 // DiscordBuilder provides a fluent API for setting up a mock Discord server.
 type DiscordBuilder struct {
-	md    *MockDiscord
-	errs  []error
+	md   *MockDiscord
+	errs []error
 }
 
 // NewDiscordBuilder creates a new Discord builder.

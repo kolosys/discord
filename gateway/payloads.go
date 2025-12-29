@@ -9,10 +9,10 @@ import (
 
 // GatewayPayload represents a Discord gateway message.
 type GatewayPayload struct {
-	Op Opcode          `json:"op"`           // Opcode
-	D  json.RawMessage `json:"d,omitempty"`  // Data (varies by opcode)
-	S  *int            `json:"s,omitempty"`  // Sequence number (only for Dispatch)
-	T  *string         `json:"t,omitempty"`  // Event name (only for Dispatch)
+	Op Opcode          `json:"op"`          // Opcode
+	D  json.RawMessage `json:"d,omitempty"` // Data (varies by opcode)
+	S  *int            `json:"s,omitempty"` // Sequence number (only for Dispatch)
+	T  *string         `json:"t,omitempty"` // Event name (only for Dispatch)
 }
 
 // HelloData is the data sent in the Hello event (Opcode 10).
@@ -45,12 +45,12 @@ type PartialApplication struct {
 
 // IdentifyData is sent to identify a new session.
 type IdentifyData struct {
-	Token      string               `json:"token"`       // Bot token
-	Intents    Intent               `json:"intents"`     // Gateway intents
-	Properties IdentifyProperties   `json:"properties"`  // Connection properties
-	Compress   bool                 `json:"compress"`    // Whether to use compression
-	Shard      *[2]int              `json:"shard,omitempty"` // [shard_id, num_shards]
-	Presence   *PresenceUpdate      `json:"presence,omitempty"` // Initial presence
+	Token      string             `json:"token"`              // Bot token
+	Intents    Intent             `json:"intents"`            // Gateway intents
+	Properties IdentifyProperties `json:"properties"`         // Connection properties
+	Compress   bool               `json:"compress"`           // Whether to use compression
+	Shard      *[2]int            `json:"shard,omitempty"`    // [shard_id, num_shards]
+	Presence   *PresenceUpdate    `json:"presence,omitempty"` // Initial presence
 }
 
 // IdentifyProperties contains connection properties for identification.
@@ -69,10 +69,10 @@ type ResumeData struct {
 
 // PresenceUpdate represents a presence update payload.
 type PresenceUpdate struct {
-	Since      *int              `json:"since"`      // Unix time (ms) of when client went idle, or null
-	Activities []*Activity       `json:"activities"` // User's activities
-	Status     string            `json:"status"`     // Status (online, dnd, idle, invisible, offline)
-	AFK        bool              `json:"afk"`        // Whether client is AFK
+	Since      *int        `json:"since"`      // Unix time (ms) of when client went idle, or null
+	Activities []*Activity `json:"activities"` // User's activities
+	Status     string      `json:"status"`     // Status (online, dnd, idle, invisible, offline)
+	AFK        bool        `json:"afk"`        // Whether client is AFK
 }
 
 // Activity represents a user activity.
@@ -100,20 +100,20 @@ const (
 
 // RequestGuildMembersData is sent to request guild members.
 type RequestGuildMembersData struct {
-	GuildID   types.Snowflake   `json:"guild_id"`             // Guild ID
-	Query     *string           `json:"query,omitempty"`      // String to match usernames (empty for all)
-	Limit     int               `json:"limit"`                // Max members to return (0 for all)
-	Presences bool              `json:"presences,omitempty"`  // Whether to include presences
-	UserIDs   []types.Snowflake `json:"user_ids,omitempty"`   // Specific user IDs to request
-	Nonce     *string           `json:"nonce,omitempty"`      // Nonce for response matching
+	GuildID   types.Snowflake   `json:"guild_id"`            // Guild ID
+	Query     *string           `json:"query,omitempty"`     // String to match usernames (empty for all)
+	Limit     int               `json:"limit"`               // Max members to return (0 for all)
+	Presences bool              `json:"presences,omitempty"` // Whether to include presences
+	UserIDs   []types.Snowflake `json:"user_ids,omitempty"`  // Specific user IDs to request
+	Nonce     *string           `json:"nonce,omitempty"`     // Nonce for response matching
 }
 
 // VoiceStateUpdateData is sent to join/leave/move voice channels.
 type VoiceStateUpdateData struct {
-	GuildID   types.Snowflake  `json:"guild_id"`             // Guild ID
-	ChannelID *types.Snowflake `json:"channel_id"`           // Channel ID (null to disconnect)
-	SelfMute  bool             `json:"self_mute"`            // Whether to mute
-	SelfDeaf  bool             `json:"self_deaf"`            // Whether to deafen
+	GuildID   types.Snowflake  `json:"guild_id"`   // Guild ID
+	ChannelID *types.Snowflake `json:"channel_id"` // Channel ID (null to disconnect)
+	SelfMute  bool             `json:"self_mute"`  // Whether to mute
+	SelfDeaf  bool             `json:"self_deaf"`  // Whether to deafen
 }
 
 // InvalidSessionData indicates whether the session can be resumed.

@@ -92,9 +92,9 @@ func TestOptions_Creation(t *testing.T) {
 
 func TestOptions_WithValues(t *testing.T) {
 	opts := state.Options{
-		MaxGuilds:    1000,
-		MaxUsers:     10000,
-		MaxChannels:  100000,
+		MaxGuilds:   1000,
+		MaxUsers:    10000,
+		MaxChannels: 100000,
 	}
 
 	if opts.MaxGuilds != 1000 {
@@ -296,9 +296,9 @@ func TestOptions_DisableFlags(t *testing.T) {
 
 func TestOptions_TTLValues(t *testing.T) {
 	opts := state.Options{
-		GuildTTL:     5 * time.Minute,
-		ChannelTTL:   10 * time.Minute,
-		UserTTL:      1 * time.Hour,
+		GuildTTL:   5 * time.Minute,
+		ChannelTTL: 10 * time.Minute,
+		UserTTL:    1 * time.Hour,
 	}
 
 	if opts.GuildTTL != 5*time.Minute {

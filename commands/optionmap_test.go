@@ -49,11 +49,11 @@ func TestOptionMap_String_Missing(t *testing.T) {
 
 func TestOptionMap_StringDefault(t *testing.T) {
 	tests := []struct {
-		name    string
-		set     bool
-		value   string
-		def     string
-		expect  string
+		name   string
+		set    bool
+		value  string
+		def    string
+		expect string
 	}{
 		{"Missing uses default", false, "", "default", "default"},
 		{"Set uses value", true, "custom", "default", "custom"},
@@ -104,11 +104,11 @@ func TestOptionMap_Int(t *testing.T) {
 
 func TestOptionMap_IntDefault(t *testing.T) {
 	tests := []struct {
-		name    string
-		set     bool
-		value   int64
-		def     int64
-		expect  int64
+		name   string
+		set    bool
+		value  int64
+		def    int64
+		expect int64
 	}{
 		{"Missing uses default", false, 0, 100, 100},
 		{"Set uses value", true, 42, 100, 42},
@@ -158,11 +158,11 @@ func TestOptionMap_Float(t *testing.T) {
 
 func TestOptionMap_FloatDefault(t *testing.T) {
 	tests := []struct {
-		name    string
-		set     bool
-		value   float64
-		def     float64
-		expect  float64
+		name   string
+		set    bool
+		value  float64
+		def    float64
+		expect float64
 	}{
 		{"Missing uses default", false, 0, 3.14, 3.14},
 		{"Set uses value", true, 2.71, 3.14, 2.71},

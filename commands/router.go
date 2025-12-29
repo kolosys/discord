@@ -640,19 +640,19 @@ type Interaction struct {
 // InteractionMember represents a guild member in an interaction context.
 // This differs from models.GuildMember as it includes computed permissions.
 type InteractionMember struct {
-	Avatar                     *string    `json:"avatar,omitempty"`
-	Banner                     *string    `json:"banner,omitempty"`
-	CommunicationDisabledUntil *string    `json:"communication_disabled_until,omitempty"`
-	Deaf                       bool       `json:"deaf"`
-	Flags                      int32      `json:"flags"`
-	JoinedAt                   string     `json:"joined_at"`
-	Mute                       bool       `json:"mute"`
-	Nick                       *string    `json:"nick,omitempty"`
-	Pending                    bool       `json:"pending"`
-	PremiumSince               *string    `json:"premium_since,omitempty"`
-	Roles                      []string   `json:"roles"`
-	User                       any        `json:"user"`
-	Permissions                string     `json:"permissions,omitempty"`
+	Avatar                     *string  `json:"avatar,omitempty"`
+	Banner                     *string  `json:"banner,omitempty"`
+	CommunicationDisabledUntil *string  `json:"communication_disabled_until,omitempty"`
+	Deaf                       bool     `json:"deaf"`
+	Flags                      int32    `json:"flags"`
+	JoinedAt                   string   `json:"joined_at"`
+	Mute                       bool     `json:"mute"`
+	Nick                       *string  `json:"nick,omitempty"`
+	Pending                    bool     `json:"pending"`
+	PremiumSince               *string  `json:"premium_since,omitempty"`
+	Roles                      []string `json:"roles"`
+	User                       any      `json:"user"`
+	Permissions                string   `json:"permissions,omitempty"`
 }
 
 // InteractionData contains the data for an interaction.

@@ -129,4 +129,3 @@ func (r *Router) SyncOnReady(ctx context.Context, guildIDs ...string) func() {
 		}
 	}
 }
-

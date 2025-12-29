@@ -41,27 +41,27 @@ const (
 	GuildScheduledEventUserRemove Type = "GUILD_SCHEDULED_EVENT_USER_REMOVE"
 
 	// Channel Events
-	ChannelCreate Type = "CHANNEL_CREATE"
-	ChannelUpdate Type = "CHANNEL_UPDATE"
-	ChannelDelete Type = "CHANNEL_DELETE"
+	ChannelCreate     Type = "CHANNEL_CREATE"
+	ChannelUpdate     Type = "CHANNEL_UPDATE"
+	ChannelDelete     Type = "CHANNEL_DELETE"
 	ChannelPinsUpdate Type = "CHANNEL_PINS_UPDATE"
 
 	// Thread Events
-	ThreadCreate      Type = "THREAD_CREATE"
-	ThreadUpdate      Type = "THREAD_UPDATE"
-	ThreadDelete      Type = "THREAD_DELETE"
-	ThreadListSync    Type = "THREAD_LIST_SYNC"
-	ThreadMemberUpdate Type = "THREAD_MEMBER_UPDATE"
+	ThreadCreate        Type = "THREAD_CREATE"
+	ThreadUpdate        Type = "THREAD_UPDATE"
+	ThreadDelete        Type = "THREAD_DELETE"
+	ThreadListSync      Type = "THREAD_LIST_SYNC"
+	ThreadMemberUpdate  Type = "THREAD_MEMBER_UPDATE"
 	ThreadMembersUpdate Type = "THREAD_MEMBERS_UPDATE"
 
 	// Message Events
-	MessageCreate            Type = "MESSAGE_CREATE"
-	MessageUpdate            Type = "MESSAGE_UPDATE"
-	MessageDelete            Type = "MESSAGE_DELETE"
-	MessageDeleteBulk        Type = "MESSAGE_DELETE_BULK"
-	MessageReactionAdd       Type = "MESSAGE_REACTION_ADD"
-	MessageReactionRemove    Type = "MESSAGE_REACTION_REMOVE"
-	MessageReactionRemoveAll Type = "MESSAGE_REACTION_REMOVE_ALL"
+	MessageCreate              Type = "MESSAGE_CREATE"
+	MessageUpdate              Type = "MESSAGE_UPDATE"
+	MessageDelete              Type = "MESSAGE_DELETE"
+	MessageDeleteBulk          Type = "MESSAGE_DELETE_BULK"
+	MessageReactionAdd         Type = "MESSAGE_REACTION_ADD"
+	MessageReactionRemove      Type = "MESSAGE_REACTION_REMOVE"
+	MessageReactionRemoveAll   Type = "MESSAGE_REACTION_REMOVE_ALL"
 	MessageReactionRemoveEmoji Type = "MESSAGE_REACTION_REMOVE_EMOJI"
 
 	// Presence Events

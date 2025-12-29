@@ -7,9 +7,9 @@ import (
 
 // Session manages the state of a Discord gateway session.
 type Session struct {
-	sessionID string
-	sequence  atomic.Int64
-	resumeURL string
+	sessionID  string
+	sequence   atomic.Int64
+	resumeURL  string
 	identified atomic.Bool
 
 	mu sync.RWMutex

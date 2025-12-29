@@ -395,4 +395,3 @@ func (c *ComponentContext) Responded() bool {
 func (c *ComponentContext) Deferred() bool {
 	return c.deferred
 }
-

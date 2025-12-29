@@ -12,12 +12,12 @@ import (
 // UserFixture creates a test User with sensible defaults.
 func UserFixture(id, username string, opts ...func(*models.User)) *models.User {
 	user := &models.User{
-		ID:           id,
-		Username:     username,
+		ID:            id,
+		Username:      username,
 		Discriminator: "0000",
-		Bot:          false,
-		Flags:        0,
-		PublicFlags:  0,
+		Bot:           false,
+		Flags:         0,
+		PublicFlags:   0,
 	}
 	for _, opt := range opts {
 		opt(user)
@@ -28,12 +28,12 @@ func UserFixture(id, username string, opts ...func(*models.User)) *models.User {
 // BotFixture creates a test User that is a bot.
 func BotFixture(id, username string, opts ...func(*models.User)) *models.User {
 	user := &models.User{
-		ID:           id,
-		Username:     username,
+		ID:            id,
+		Username:      username,
 		Discriminator: "0000",
-		Bot:          true,
-		Flags:        0,
-		PublicFlags:  0,
+		Bot:           true,
+		Flags:         0,
+		PublicFlags:   0,
 	}
 	for _, opt := range opts {
 		opt(user)
@@ -65,7 +65,7 @@ func GuildFixture(id, name string, opts ...func(*models.Guild)) *models.Guild {
 		PreferredLocale:             "en-US",
 		Features:                    []string{},
 		Emojis:                      []any{},
-		Roles:                        []any{},
+		Roles:                       []any{},
 		Stickers:                    []any{},
 		SystemChannelFlags:          0,
 	}
@@ -79,23 +79,23 @@ func GuildFixture(id, name string, opts ...func(*models.Guild)) *models.Guild {
 func MessageFixture(id, content string, opts ...func(*models.Message)) *models.Message {
 	now := time.Now()
 	message := &models.Message{
-		ID:        id,
-		ChannelID: "1",
-		Content:   content,
-		Author: UserFixture("1", "test-user"),
-		Timestamp:   now,
+		ID:              id,
+		ChannelID:       "1",
+		Content:         content,
+		Author:          UserFixture("1", "test-user"),
+		Timestamp:       now,
 		EditedTimestamp: nil,
-		Tts:         false,
+		Tts:             false,
 		MentionEveryone: false,
-		Mentions:    []any{},
-		MentionRoles: []string{},
+		Mentions:        []any{},
+		MentionRoles:    []string{},
 		MentionChannels: []any{},
-		Attachments: []any{},
-		Embeds:      []any{},
-		Reactions:   []any{},
-		Pinned:      false,
-		Type:        0,
-		Flags:       0,
+		Attachments:     []any{},
+		Embeds:          []any{},
+		Reactions:       []any{},
+		Pinned:          false,
+		Type:            0,
+		Flags:           0,
 	}
 	for _, opt := range opts {
 		opt(message)
@@ -106,14 +106,14 @@ func MessageFixture(id, content string, opts ...func(*models.Message)) *models.M
 // GuildMemberFixture creates a test GuildMember with sensible defaults.
 func GuildMemberFixture(userID string, opts ...func(*models.GuildMember)) *models.GuildMember {
 	member := &models.GuildMember{
-		User:     UserFixture(userID, "test-user"),
-		Nick:     nil,
-		Roles:    []string{},
-		JoinedAt: time.Now().Add(-24 * time.Hour),
-		PremiumSince: nil,
-		Deaf:     false,
-		Mute:     false,
-		Pending:  false,
+		User:                       UserFixture(userID, "test-user"),
+		Nick:                       nil,
+		Roles:                      []string{},
+		JoinedAt:                   time.Now().Add(-24 * time.Hour),
+		PremiumSince:               nil,
+		Deaf:                       false,
+		Mute:                       false,
+		Pending:                    false,
 		CommunicationDisabledUntil: nil,
 	}
 	for _, opt := range opts {
