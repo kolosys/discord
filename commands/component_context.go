@@ -69,6 +69,7 @@ type ComponentContext struct {
 	responded bool
 	deferred  bool
 	appID     string
+	services  *ServiceRegistry
 }
 
 // ComponentHandlerFunc is the signature for component handler functions.

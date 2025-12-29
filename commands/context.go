@@ -91,6 +91,7 @@ type Context struct {
 	responded bool
 	deferred  bool
 	appID     string
+	services  *ServiceRegistry
 }
 
 // InteractionType represents the type of interaction.

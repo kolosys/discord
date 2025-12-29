@@ -43,8 +43,8 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"status":  "ok",
-			"gateway": bot.Gateway().IsReady(),
-			"shards":  bot.Gateway().ShardCount(),
+			"gateway": bot.Gateway.IsReady(),
+			"shards":  bot.Gateway.ShardCount(),
 		})
 	})
 
@@ -52,7 +52,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"running": bot.IsRunning(),
-			"shards":  bot.Gateway().ShardCount(),
+			"shards":  bot.Gateway.ShardCount(),
 		})
 	})
 

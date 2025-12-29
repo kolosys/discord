@@ -32,6 +32,9 @@ type Router struct {
 
 	// Responder for creating contexts
 	responder Responder
+
+	// Services for dependency injection
+	services *ServiceRegistry
 }
 
 // ComponentMiddleware wraps a component handler function.
@@ -51,7 +54,14 @@ func NewRouter() *Router {
 		commands:   make(map[string]Command),
 		groups:     make(map[string]*CommandGroup),
 		components: make(map[string]ComponentHandlerFunc),
+		services:   newServiceRegistry(),
 	}
+}
+
+// RegisterService registers a service for dependency injection.
+// Services can be retrieved in handlers using commands.Service[T](ctx).
+func (r *Router) RegisterService(service any) {
+	r.services.Register(service)
 }
 
 // SetSyncer sets the command syncer.
@@ -389,6 +399,7 @@ func (r *Router) createCommandContext(ctx context.Context, interaction *Interact
 		ChannelID:        interaction.ChannelID,
 		Locale:           interaction.Locale,
 		GuildLocale:      interaction.GuildLocale,
+		services:         r.services,
 	}
 
 	// Set user from member if not directly set
@@ -450,6 +461,7 @@ func (r *Router) createComponentContext(ctx context.Context, interaction *Intera
 		Locale:           interaction.Locale,
 		GuildLocale:      interaction.GuildLocale,
 		Message:          interaction.Message,
+		services:         r.services,
 	}
 
 	// Set user from member if not directly set

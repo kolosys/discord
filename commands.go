@@ -84,7 +84,7 @@ func (b *Bot) setupInteractionHandler() {
 
 // RespondToInteraction sends a response to an interaction.
 func (b *Bot) RespondToInteraction(ctx context.Context, interactionID, token string, response *commands.InteractionResponse) error {
-	err := b.rest.CreateInteractionResponse(ctx, interactionID, token, response)
+	err := b.REST.CreateInteractionResponse(ctx, interactionID, token, response)
 	if err != nil {
 		return fmt.Errorf("discord: failed to respond to interaction: %w", err)
 	}
@@ -103,7 +103,7 @@ func (b *Bot) EditInteractionResponse(ctx context.Context, token string, edit *c
 		Content: edit.Content,
 	}
 
-	_, err := b.rest.EditOriginalInteractionResponse(ctx, appID, token, modelEdit)
+	_, err := b.REST.EditOriginalInteractionResponse(ctx, appID, token, modelEdit)
 	if err != nil {
 		return fmt.Errorf("discord: failed to edit interaction response: %w", err)
 	}
@@ -116,7 +116,7 @@ func (b *Bot) DeleteInteractionResponse(ctx context.Context, token string) error
 	if appID == "" {
 		return fmt.Errorf("discord: application ID not set")
 	}
-	err := b.rest.DeleteOriginalInteractionResponse(ctx, appID, token)
+	err := b.REST.DeleteOriginalInteractionResponse(ctx, appID, token)
 	if err != nil {
 		return fmt.Errorf("discord: failed to delete interaction response: %w", err)
 	}
@@ -129,7 +129,7 @@ func (b *Bot) FollowupMessage(ctx context.Context, token string, message *comman
 	if appID == "" {
 		return nil, fmt.Errorf("discord: application ID not set")
 	}
-	msg, err := b.rest.CreateFollowupMessage(ctx, appID, token, message)
+	msg, err := b.REST.CreateFollowupMessage(ctx, appID, token, message)
 	if err != nil {
 		return nil, fmt.Errorf("discord: failed to send followup message: %w", err)
 	}
@@ -140,7 +140,7 @@ func (b *Bot) FollowupMessage(ctx context.Context, token string, message *comman
 
 // SyncCommands syncs commands globally.
 func (b *Bot) SyncCommands(ctx context.Context, appID string, cmds []commands.ApplicationCommandCreate) error {
-	_, err := b.rest.BulkOverwriteGlobalCommands(ctx, appID, cmds)
+	_, err := b.REST.BulkOverwriteGlobalCommands(ctx, appID, cmds)
 	if err != nil {
 		return fmt.Errorf("discord: failed to sync commands: %w", err)
 	}
@@ -149,7 +149,7 @@ func (b *Bot) SyncCommands(ctx context.Context, appID string, cmds []commands.Ap
 
 // SyncGuildCommands syncs commands to a specific guild.
 func (b *Bot) SyncGuildCommands(ctx context.Context, appID, guildID string, cmds []commands.ApplicationCommandCreate) error {
-	_, err := b.rest.BulkOverwriteGuildCommands(ctx, appID, guildID, cmds)
+	_, err := b.REST.BulkOverwriteGuildCommands(ctx, appID, guildID, cmds)
 	if err != nil {
 		return fmt.Errorf("discord: failed to sync guild commands: %w", err)
 	}

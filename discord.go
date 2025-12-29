@@ -10,6 +10,7 @@ import (
 	"github.com/kolosys/discord/events"
 	"github.com/kolosys/discord/gateway"
 	"github.com/kolosys/discord/rest"
+	"github.com/kolosys/discord/state"
 	"github.com/kolosys/helix"
 	"github.com/kolosys/ion/workerpool"
 	"github.com/kolosys/nova/bus"
@@ -30,17 +31,20 @@ _________________________________________
 // - Discord Gateway (real-time events via WebSocket)
 // - Discord REST client (API calls)
 // - Helix HTTP server (webhooks, interactions, admin API) [optional]
+// - State cache (automatic entity caching) [enabled by default]
 type Bot struct {
 	*helix.Server // Embedded Helix server (nil if HTTP disabled)
 
+	REST    *rest.REST       // Discord REST client
+	Gateway *gateway.Gateway // Discord Gateway client
+	Bus     bus.EventBus     // Event bus for advanced usage
+	State   *state.State     // State cache (nil if disabled)
+
 	token         string
 	applicationID string
-	rest          *rest.REST
-	gateway       *gateway.Gateway
-	events        bus.EventBus
 	dispatcher    *events.Dispatcher
 	worker        *workerpool.Pool
-	router        *commands.Router // Per-instance command router
+	router        *commands.Router
 
 	httpEnabled bool
 	mu          sync.RWMutex
@@ -61,8 +65,12 @@ type Options struct {
 	// REST client options
 	REST *rest.Options
 
-	// Helix server options (optional, for advanced HTTP configuration)
-	Helix *helix.Options
+	// Server options (optional, for advanced HTTP configuration)
+	Server *helix.Options
+
+	// State options (optional, for cache configuration)
+	State        *state.Options
+	DisableState bool // Set to true to disable state caching entirely
 }
 
 // New creates a new Discord bot.
@@ -93,11 +101,21 @@ func New(opts *Options) (*Bot, error) {
 	// Create gateway
 	gw := gateway.NewGateway(opts.Token, opts.Intents, eventBus)
 
+	// Create state cache if not disabled
+	var st *state.State
+	if !opts.DisableState {
+		st = state.New(r, opts.State)
+		if err := st.RegisterHandlers(dispatcher); err != nil {
+			return nil, fmt.Errorf("discord: failed to register state handlers: %w", err)
+		}
+	}
+
 	bot := &Bot{
+		REST:       r,
+		Gateway:    gw,
+		Bus:        eventBus,
+		State:      st,
 		token:      opts.Token,
-		rest:       r,
-		gateway:    gw,
-		events:     eventBus,
 		dispatcher: dispatcher,
 		worker:     worker,
 		router:     commands.NewRouter(),
@@ -105,7 +123,7 @@ func New(opts *Options) (*Bot, error) {
 
 	// Create HTTP server if address is specified
 	if opts.Addr != "" {
-		helixOpts := opts.Helix
+		helixOpts := opts.Server
 		if helixOpts == nil {
 			helixOpts = &helix.Options{}
 		}
@@ -118,6 +136,7 @@ func New(opts *Options) (*Bot, error) {
 		helixOpts.Banner = discord_banner
 		helixOpts.HideBanner = false
 
+		// Setup auto port
 		helixOpts.AutoPort = true
 		helixOpts.MaxPortAttempts = 10
 
@@ -126,26 +145,6 @@ func New(opts *Options) (*Bot, error) {
 	}
 
 	return bot, nil
-}
-
-// REST returns the Discord REST client.
-func (b *Bot) REST() *rest.REST {
-	return b.rest
-}
-
-// Gateway returns the Discord Gateway client.
-func (b *Bot) Gateway() *gateway.Gateway {
-	return b.gateway
-}
-
-// Bus returns the underlying event bus for advanced usage.
-func (b *Bot) Bus() bus.EventBus {
-	return b.events
-}
-
-// HTTPEnabled returns whether the HTTP server is enabled.
-func (b *Bot) HTTPEnabled() bool {
-	return b.httpEnabled
 }
 
 // Start connects to the Discord gateway and optionally starts the HTTP server.
@@ -159,7 +158,7 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.mu.Unlock()
 
 	// Get current user to set application ID (for bots, user ID = application ID)
-	user, err := b.rest.GetCurrentUser(ctx)
+	user, err := b.REST.GetCurrentUser(ctx)
 	if err != nil {
 		b.mu.Lock()
 		b.running = false
@@ -169,7 +168,7 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.SetApplicationID(user.ID)
 
 	// Get gateway URL and shard count from Discord
-	gatewayInfo, err := b.rest.GetBotGateway(ctx)
+	gatewayInfo, err := b.REST.GetBotGateway(ctx)
 	if err != nil {
 		b.mu.Lock()
 		b.running = false
@@ -183,7 +182,7 @@ func (b *Bot) Start(ctx context.Context) error {
 		shardCount = 1
 	}
 
-	if err := b.gateway.Connect(ctx, gatewayInfo.URL, shardCount); err != nil {
+	if err := b.Gateway.Connect(ctx, gatewayInfo.URL, shardCount); err != nil {
 		b.mu.Lock()
 		b.running = false
 		b.mu.Unlock()
@@ -217,8 +216,13 @@ func (b *Bot) Stop(ctx context.Context) error {
 	}
 
 	// Close gateway connection
-	if err := b.gateway.Close(); err != nil {
+	if err := b.Gateway.Close(); err != nil {
 		return fmt.Errorf("discord: failed to close gateway: %w", err)
+	}
+
+	// Close state cache if enabled
+	if b.State != nil {
+		b.State.Close()
 	}
 
 	// Shutdown HTTP server if enabled
@@ -229,7 +233,7 @@ func (b *Bot) Stop(ctx context.Context) error {
 	}
 
 	// Shutdown event bus
-	if err := b.events.Shutdown(ctx); err != nil {
+	if err := b.Bus.Shutdown(ctx); err != nil {
 		return fmt.Errorf("discord: failed to shutdown event bus: %w", err)
 	}
 
