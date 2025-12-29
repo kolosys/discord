@@ -17,7 +17,7 @@ import (
 type Shard struct {
 	id      int
 	total   int
-	client  *axon.Client[GatewayPayload]
+	client  GatewayClient[GatewayPayload]
 	session *Session
 	hb      *HeartbeatManager
 	events  bus.EventBus
@@ -47,6 +47,29 @@ func NewShard(id, total int, token string, intents Intent, events bus.EventBus) 
 	}
 }
 
+// NewShardWithClient creates a new shard with a custom client (for testing).
+func NewShardWithClient(
+	id, total int,
+	token string,
+	intents Intent,
+	events bus.EventBus,
+	client GatewayClient[GatewayPayload],
+) *Shard {
+	session := NewSession()
+	hb := NewHeartbeatManager(session)
+
+	return &Shard{
+		id:      id,
+		total:   total,
+		client:  client,
+		session: session,
+		hb:      hb,
+		events:  events,
+		token:   token,
+		intents: intents,
+	}
+}
+
 // Connect establishes a WebSocket connection to the gateway.
 func (s *Shard) Connect(ctx context.Context, url string) error {
 	// Store parent context for use in handlers
@@ -54,10 +77,43 @@ func (s *Shard) Connect(ctx context.Context, url string) error {
 	s.ctx = ctx
 	s.mu.Unlock()
 
-	// Add gateway version and encoding parameters
-	gatewayURL := fmt.Sprintf("%s?v=10&encoding=json", url)
+	// If client already injected (test mode), use it
+	if s.client != nil {
+		return s.connectWithExistingClient(ctx)
+	}
 
-	// Create axon client options
+	// Production path: create client with reconnection options
+	gatewayURL := fmt.Sprintf("%s?v=10&encoding=json", url)
+	opts := s.buildClientOptions()
+	client := axon.NewClient[GatewayPayload](gatewayURL, opts)
+
+	s.mu.Lock()
+	s.client = client
+	s.mu.Unlock()
+
+	return s.connectWithExistingClient(ctx)
+}
+
+// connectWithExistingClient sets up callbacks and connects the client.
+func (s *Shard) connectWithExistingClient(ctx context.Context) error {
+	s.client.OnMessage(s.handlePayload)
+	s.client.OnConnect(func(c *axon.Client[GatewayPayload]) {
+		log.Printf("[Shard %d] Connected to gateway", s.id)
+	})
+	s.client.OnDisconnect(func(c *axon.Client[GatewayPayload], err error) {
+		s.handleDisconnect(c, err)
+	})
+
+	// Connect with read loop
+	if err := s.client.ConnectWithReadLoop(ctx); err != nil {
+		return fmt.Errorf("failed to connect to gateway: %w", err)
+	}
+
+	return nil
+}
+
+// buildClientOptions creates axon client options for Discord gateway connections.
+func (s *Shard) buildClientOptions() *axon.ClientOptions {
 	opts := axon.DefaultClientOptions()
 	opts.Reconnect.Enabled = true
 	opts.Reconnect.MaxAttempts = 0 // Unlimited reconnection attempts
@@ -72,6 +128,7 @@ func (s *Shard) Connect(ctx context.Context, url string) error {
 	opts.Reconnect.OnReconnectFailed = func(attempt int, err error) {
 		log.Printf("[Shard %d] Reconnect attempt %d failed: %v", s.id, attempt, err)
 	}
+
 	// Custom reconnection logic for Discord gateway
 	// Discord close code 1000 should trigger reconnection (unlike standard WebSocket behavior)
 	opts.Reconnect.ShouldReconnect = func(err error, attempt int) bool {
@@ -93,28 +150,7 @@ func (s *Shard) Connect(ctx context.Context, url string) error {
 	// Disable WebSocket-level pings - Discord uses its own heartbeat mechanism (opcode 1)
 	opts.PingInterval = 0
 
-	// Create WebSocket client
-	client := axon.NewClient[GatewayPayload](gatewayURL, opts)
-
-	// Set up callbacks
-	client.OnMessage(s.handlePayload)
-	client.OnConnect(func(c *axon.Client[GatewayPayload]) {
-		log.Printf("[Shard %d] Connected to gateway", s.id)
-	})
-	client.OnDisconnect(func(c *axon.Client[GatewayPayload], err error) {
-		s.handleDisconnect(c, err)
-	})
-
-	s.mu.Lock()
-	s.client = client
-	s.mu.Unlock()
-
-	// Connect with read loop
-	if err := client.ConnectWithReadLoop(ctx); err != nil {
-		return fmt.Errorf("failed to connect to gateway: %w", err)
-	}
-
-	return nil
+	return opts
 }
 
 // handlePayload processes incoming gateway payloads.

@@ -1,2 +1,14 @@
-github.com/kolosys/helix v0.3.0 h1:pmUR6iMAlcRo1HEnkyV1dykK/i5Gn0fE3uGaBKqSLWk=
-github.com/kolosys/helix v0.3.0/go.mod h1:kSd/bOZ9xlyaH9YLhU8jHu9werV3u/dUZ9B9ArT42lQ=
+github.com/kolosys/atomic v0.2.0 h1:mxv1JZnGnhnyFqD3gHw7h7nZkOzwdhwqQdTMLWo+jXI=
+github.com/kolosys/atomic v0.2.0/go.mod h1:G3Y4Q8lkf57CmHLaVzF7oYOxqjnlKdhBHpqr5rmBEV8=
+github.com/kolosys/axon v0.2.0 h1:z4QcxoHAvvhDsdzg50nR4LcfHqYC4tCzcZBkFXacKBc=
+github.com/kolosys/axon v0.2.0/go.mod h1:8n70gJTU96DnF7eptk1G4vodTHe3Wgg4yJR7CZbUPf8=
+github.com/kolosys/helix v0.4.0 h1:IgVImClsRyrpDuZdsmQvIbdu6tfm3HP2hLlSeka0Yg8=
+github.com/kolosys/helix v0.4.0/go.mod h1:kSd/bOZ9xlyaH9YLhU8jHu9werV3u/dUZ9B9ArT42lQ=
+github.com/kolosys/ion v0.3.0 h1:SYpBy+AuwNB6IKtUODI8u8O3HddcjzygQvfRquCNopo=
+github.com/kolosys/ion v0.3.0/go.mod h1:CQjInGVDNATJh9AbyMoe7+N9WXfmYiVIOeLCdRpDB/U=
+github.com/kolosys/neuron v0.6.0 h1:OYrjmzYaPiTZw8leGjv0x0+aQy0nKvJG03d91GFjAbg=
+github.com/kolosys/neuron v0.6.0/go.mod h1:n1+CwQWKI/HVL0DA38jumtFFT9MpWirAO+n63Md3Pkc=
+github.com/kolosys/nova v0.3.0 h1:LEA6TnegjK/Wzy2IMEAcrlP/EnYJOj9CjSTllB68fFo=
+github.com/kolosys/nova v0.3.0/go.mod h1:7Bb3zHjJRmfAAyUi2HDPxg6zriQwSbXFqh9GHI12EdM=
+github.com/kolosys/synapse v0.2.0 h1:77EXNSU5KylToM3h5ZqkL1E14IMyhCjtGKN5WNbR9es=
+github.com/kolosys/synapse v0.2.0/go.mod h1:vuFOCOO8mn4eY0Qpd9gjNIigZ16s+OBtHU3qf/pvpJs=

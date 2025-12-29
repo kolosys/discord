@@ -26,7 +26,7 @@ func TestBuildComponents_SingleButton(t *testing.T) {
 
 func TestBuildComponents_FiveButtons(t *testing.T) {
 	var buttons []components.Component
-	for i := 0; i < components.MaxButtonsPerRow; i++ {
+	for range components.MaxButtonsPerRow {
 		buttons = append(buttons, components.Button("id").Label("Button").Build())
 	}
 
@@ -45,7 +45,7 @@ func TestBuildComponents_FiveButtons(t *testing.T) {
 
 func TestBuildComponents_SixButtons(t *testing.T) {
 	var buttons []components.Component
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		buttons = append(buttons, components.Button("id").Label("Button").Build())
 	}
 
@@ -120,7 +120,7 @@ func TestBuildComponents_Mixed(t *testing.T) {
 	var comps []components.Component
 
 	// 3 buttons
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		comps = append(comps, components.Button("id").Label("Button").Build())
 	}
 
@@ -130,7 +130,7 @@ func TestBuildComponents_Mixed(t *testing.T) {
 	comps = append(comps, sel.Build())
 
 	// 2 more buttons
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		comps = append(comps, components.Button("id").Label("Button").Build())
 	}
 
@@ -185,7 +185,7 @@ func TestBuildComponents_Type(t *testing.T) {
 
 func TestBuildComponentsSafe_Valid(t *testing.T) {
 	var comps []components.Component
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		comps = append(comps, components.Button("id").Label("Button").Build())
 	}
 
@@ -228,8 +228,8 @@ func TestBuildComponentsSafe_TooManyComponents(t *testing.T) {
 	// Let's use a different approach: use action rows with mixed components
 
 	// Create 5 action rows with multiple buttons each
-	for i := 0; i < components.MaxActionRows; i++ {
-		for j := 0; j < 5; j++ {
+	for range components.MaxActionRows {
+		for range 5 {
 			comps = append(comps, components.Button("id").Label("Button").Build())
 		}
 	}
@@ -285,7 +285,7 @@ func TestActionRow_Empty(t *testing.T) {
 
 func TestBuildComponents_TenButtons(t *testing.T) {
 	var buttons []components.Component
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		buttons = append(buttons, components.Button("id").Label("Button").Build())
 	}
 
@@ -309,7 +309,7 @@ func TestBuildComponents_MaxRows(t *testing.T) {
 	var comps []components.Component
 
 	// Create MaxActionRows worth of selects (each gets its own row)
-	for i := 0; i < components.MaxActionRows; i++ {
+	for range components.MaxActionRows {
 		sel := components.StringSelect("id")
 		sel.Option("Option", "value")
 		comps = append(comps, sel.Build())
@@ -353,7 +353,7 @@ func TestBuildComponents_SelectWithButtons(t *testing.T) {
 
 func TestBuildComponents_ButtonGrouping(t *testing.T) {
 	var buttons []components.Component
-	for i := 0; i < 7; i++ {
+	for range 7 {
 		buttons = append(buttons, components.Button("id").Label("Button").Build())
 	}
 
