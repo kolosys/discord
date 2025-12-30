@@ -40,9 +40,9 @@ func TestManagerNew(t *testing.T) {
 		{
 			name: "valid options with HTTP",
 			opts: &server.Options{
-				Enabled: true,
-				ConnectFn:  func(context.Context) error { return nil },
-				StopFn:     func(context.Context) error { return nil },
+				Enabled:   true,
+				ConnectFn: func(context.Context) error { return nil },
+				StopFn:    func(context.Context) error { return nil },
 			},
 			wantErr: false,
 		},
@@ -78,9 +78,9 @@ func TestManagerHTTPServer(t *testing.T) {
 
 	t.Run("HTTP enabled returns server", func(t *testing.T) {
 		m, _ := server.New(&server.Options{
-			Enabled: true,
-			ConnectFn:  func(context.Context) error { return nil },
-			StopFn:     func(context.Context) error { return nil },
+			Enabled:   true,
+			ConnectFn: func(context.Context) error { return nil },
+			StopFn:    func(context.Context) error { return nil },
 		})
 
 		if m.HTTPServer() == nil {
@@ -128,9 +128,9 @@ func TestManagerStopNonRunning(t *testing.T) {
 func TestManagerOptions(t *testing.T) {
 	t.Run("applyDefaults sets addr", func(t *testing.T) {
 		opts := &server.Options{
-			Enabled: true,
-			ConnectFn:  func(context.Context) error { return nil },
-			StopFn:     func(context.Context) error { return nil },
+			Enabled:   true,
+			ConnectFn: func(context.Context) error { return nil },
+			StopFn:    func(context.Context) error { return nil },
 		}
 		m, _ := server.New(opts)
 
