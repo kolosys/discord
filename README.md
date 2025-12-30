@@ -2,9 +2,8 @@
 
 ![GoVersion](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Zero Dependencies](https://img.shields.io/badge/Zero-Dependencies-green.svg)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kolosys/helix.svg)](https://pkg.go.dev/github.com/kolosys/helix)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kolosys/helix)](https://goreportcard.com/report/github.com/kolosys/helix)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kolosys/discord.svg)](https://pkg.go.dev/github.com/kolosys/discord)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kolosys/discord)](https://goreportcard.com/report/github.com/kolosys/discord)
 
 ```
      ____  _                          __

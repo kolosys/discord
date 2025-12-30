@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main]
 
-
 jobs:
   lint:
     uses: kolosys/.actions/.github/workflows/go-lint.yml@main
