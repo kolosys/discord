@@ -4,11 +4,26 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/kolosys/atomic/collection"
+	"github.com/kolosys/discord/events"
+	"github.com/kolosys/discord/rest"
+	"github.com/kolosys/ion/workerpool"
 	"github.com/kolosys/nova/bus"
 )
+
+// Options configures the Gateway with optional dependency overrides.
+type Options struct {
+	WorkerPool *workerpool.Pool
+	EventBus   bus.EventBus
+	GatewayURL string
+	ShardCount int
+}
 
 // Gateway manages Discord gateway connections across multiple shards.
 type Gateway struct {
@@ -17,17 +32,54 @@ type Gateway struct {
 	shards  *collection.Collection[int, *Shard]
 	events  bus.EventBus
 
+	dispatcher *events.Dispatcher
+	worker     *workerpool.Pool
+	rest       *rest.REST
+	ownsDeps   bool
+
 	mu      sync.RWMutex
 	running bool
+	once    sync.Once
 }
 
 // NewGateway creates a new gateway manager.
-func NewGateway(token string, intents Intent, events bus.EventBus) *Gateway {
+// If opts is nil, sensible defaults are used for all dependencies.
+func NewGateway(token string, intents Intent, opts *Options) *Gateway {
+	if opts == nil {
+		opts = &Options{}
+	}
+
+	ownsDeps := false
+	worker := opts.WorkerPool
+	if worker == nil {
+		worker = workerpool.New(10, 100, workerpool.WithName("discord-gateway"))
+		ownsDeps = true
+	}
+
+	eventBus := opts.EventBus
+	if eventBus == nil {
+		eventBus = bus.New(bus.Config{
+			WorkerPool:          worker,
+			DefaultBufferSize:   1000,
+			DefaultPartitions:   4,
+			DefaultDeliveryMode: bus.AtLeastOnce,
+			Name:                "discord-gateway",
+		})
+		ownsDeps = true
+	}
+
+	r := rest.New(token, nil)
+	dispatcher := events.NewDispatcher(eventBus)
+
 	return &Gateway{
-		token:   token,
-		intents: intents,
-		shards:  collection.New[int, *Shard](),
-		events:  events,
+		token:      token,
+		intents:    intents,
+		shards:     collection.New[int, *Shard](),
+		events:     eventBus,
+		dispatcher: dispatcher,
+		worker:     worker,
+		rest:       r,
+		ownsDeps:   ownsDeps,
 	}
 }
 
@@ -91,6 +143,81 @@ func (g *Gateway) Connect(ctx context.Context, url string, shardCount int) error
 // Events returns the event bus for subscribing to gateway events.
 func (g *Gateway) Events() bus.EventBus {
 	return g.events
+}
+
+// Dispatcher returns the event dispatcher for registering event handlers.
+func (g *Gateway) Dispatcher() *events.Dispatcher {
+	return g.dispatcher
+}
+
+// Start connects to the Discord gateway and blocks until SIGINT or SIGTERM.
+// Automatically fetches gateway URL and shard count from Discord API.
+func (g *Gateway) Start(ctx context.Context) error {
+	gatewayInfo, err := g.rest.GetBotGateway(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get gateway info: %w", err)
+	}
+
+	url := gatewayInfo.URL
+	shardCount := int(gatewayInfo.Shards)
+	if shardCount <= 0 {
+		shardCount = 1
+	}
+
+	if err := g.Connect(ctx, url, shardCount); err != nil {
+		return err
+	}
+
+	return g.waitForShutdown()
+}
+
+func (g *Gateway) waitForShutdown() error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	<-sigCh
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return g.Stop(shutdownCtx)
+}
+
+// Stop gracefully shuts down the gateway.
+func (g *Gateway) Stop(ctx context.Context) error {
+	var err error
+	g.once.Do(func() {
+		g.mu.Lock()
+		if !g.running {
+			g.mu.Unlock()
+			return
+		}
+		g.mu.Unlock()
+
+		if g.dispatcher != nil {
+			if e := g.dispatcher.Close(); e != nil {
+				err = fmt.Errorf("failed to close dispatcher: %w", e)
+			}
+		}
+
+		if e := g.Close(); e != nil && err == nil {
+			err = e
+		}
+
+		if g.ownsDeps {
+			if e := g.events.Shutdown(ctx); e != nil && err == nil {
+				err = fmt.Errorf("failed to shutdown event bus: %w", e)
+			}
+			if e := g.worker.Close(ctx); e != nil && err == nil {
+				err = fmt.Errorf("failed to close worker pool: %w", e)
+			}
+		}
+
+		g.mu.Lock()
+		g.running = false
+		g.mu.Unlock()
+	})
+	return err
 }
 
 // Close gracefully closes all shard connections.

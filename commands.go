@@ -15,18 +15,9 @@ import (
 	"github.com/kolosys/discord/models"
 )
 
-// Commands returns the command router for registering commands.
-// The router is initialized lazily and sets up the interaction handler on first access.
+// Commands returns the command router for registering commands and interactions.
+// The router is initialized during bot creation and ready to use immediately.
 func (b *Bot) Commands() *commands.Router {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Initialize router responder and handler on first access
-	if b.router != nil && b.router.Responder() == nil {
-		b.router.SetResponder(b)
-		b.setupInteractionHandler()
-	}
-
 	return b.router
 }
 
@@ -35,7 +26,9 @@ func (b *Bot) appID() string {
 	return b.applicationID
 }
 
-// SetApplicationID sets the application ID (usually obtained from Ready event).
+// SetApplicationID sets the application ID for the bot.
+// This is automatically called during bot startup from the Ready event.
+// Manual calls are rarely needed unless managing application ID externally.
 func (b *Bot) SetApplicationID(id string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

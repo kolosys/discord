@@ -5,21 +5,21 @@ type Intent int
 
 const (
 	IntentGuilds                      Intent = 1 << 0
-	IntentGuildMembersPrivileged      Intent = 1 << 1 // Privileged
+	IntentGuildMembers                Intent = 1 << 1 // Privileged
 	IntentGuildModeration             Intent = 1 << 2
 	IntentGuildEmojisAndStickers      Intent = 1 << 3
 	IntentGuildIntegrations           Intent = 1 << 4
 	IntentGuildWebhooks               Intent = 1 << 5
 	IntentGuildInvites                Intent = 1 << 6
 	IntentGuildVoiceStates            Intent = 1 << 7
-	IntentGuildPresencesPrivileged    Intent = 1 << 8 // Privileged
+	IntentGuildPresences              Intent = 1 << 8 // Privileged
 	IntentGuildMessages               Intent = 1 << 9
 	IntentGuildMessageReactions       Intent = 1 << 10
 	IntentGuildMessageTyping          Intent = 1 << 11
 	IntentDirectMessages              Intent = 1 << 12
 	IntentDirectMessageReactions      Intent = 1 << 13
 	IntentDirectMessageTyping         Intent = 1 << 14
-	IntentMessageContentPrivileged    Intent = 1 << 15 // Privileged
+	IntentMessageContent              Intent = 1 << 15 // Privileged
 	IntentGuildScheduledEvents        Intent = 1 << 16
 	IntentAutoModerationConfiguration Intent = 1 << 20
 	IntentAutoModerationExecution     Intent = 1 << 21
@@ -27,14 +27,14 @@ const (
 	IntentDirectMessagePolls          Intent = 1 << 25
 
 	IntentsGuildAll = IntentGuilds |
-		IntentGuildMembersPrivileged |
+		IntentGuildMembers |
 		IntentGuildModeration |
 		IntentGuildEmojisAndStickers |
 		IntentGuildIntegrations |
 		IntentGuildWebhooks |
 		IntentGuildInvites |
 		IntentGuildVoiceStates |
-		IntentGuildPresencesPrivileged |
+		IntentGuildPresences |
 		IntentGuildMessages |
 		IntentGuildMessageReactions |
 		IntentGuildMessageTyping |
@@ -46,7 +46,7 @@ const (
 		IntentDirectMessageTyping |
 		IntentDirectMessagePolls
 
-	IntentsAll = IntentsGuildAll | IntentsDirectAll | IntentMessageContentPrivileged | IntentAutoModerationConfiguration | IntentAutoModerationExecution
+	IntentsAll = IntentsGuildAll | IntentsDirectAll | IntentMessageContent | IntentAutoModerationConfiguration | IntentAutoModerationExecution
 
 	IntentsNonPrivileged = IntentGuilds |
 		IntentGuildModeration |
@@ -67,7 +67,7 @@ const (
 		IntentGuildMessagePolls |
 		IntentDirectMessagePolls
 
-	IntentsPrivileged = IntentGuildMembersPrivileged | IntentGuildPresencesPrivileged | IntentMessageContentPrivileged
+	IntentsPrivileged = IntentGuildMembers | IntentGuildPresences | IntentMessageContent
 )
 
 func (i Intent) Has(intent Intent) bool {
@@ -85,13 +85,13 @@ func (i Intent) Remove(intent Intent) Intent {
 // PrivilegedIntents returns which privileged intents are included.
 func (i Intent) PrivilegedIntents() []string {
 	var privileged []string
-	if i.Has(IntentGuildMembersPrivileged) {
+	if i.Has(IntentGuildMembers) {
 		privileged = append(privileged, "GUILD_MEMBERS")
 	}
-	if i.Has(IntentGuildPresencesPrivileged) {
+	if i.Has(IntentGuildPresences) {
 		privileged = append(privileged, "GUILD_PRESENCES")
 	}
-	if i.Has(IntentMessageContentPrivileged) {
+	if i.Has(IntentMessageContent) {
 		privileged = append(privileged, "MESSAGE_CONTENT")
 	}
 	return privileged
@@ -103,7 +103,7 @@ func (i Intent) Warnings() []string {
 
 	// Check for message-related intents without MESSAGE_CONTENT
 	hasMessageIntent := i.Has(IntentGuildMessages) || i.Has(IntentDirectMessages)
-	if hasMessageIntent && !i.Has(IntentMessageContentPrivileged) {
+	if hasMessageIntent && !i.Has(IntentMessageContent) {
 		warnings = append(warnings,
 			"MESSAGE_CONTENT intent not enabled - message content, embeds, attachments, and components will be empty. "+
 				"Enable in Discord Developer Portal if needed: https://discord.com/developers/applications")
@@ -124,21 +124,21 @@ func (i Intent) String() string {
 
 	intentMap := map[Intent]string{
 		IntentGuilds:                      "GUILDS",
-		IntentGuildMembersPrivileged:      "GUILD_MEMBERS",
+		IntentGuildMembers:                "GUILD_MEMBERS",
 		IntentGuildModeration:             "GUILD_MODERATION",
 		IntentGuildEmojisAndStickers:      "GUILD_EMOJIS_AND_STICKERS",
 		IntentGuildIntegrations:           "GUILD_INTEGRATIONS",
 		IntentGuildWebhooks:               "GUILD_WEBHOOKS",
 		IntentGuildInvites:                "GUILD_INVITES",
 		IntentGuildVoiceStates:            "GUILD_VOICE_STATES",
-		IntentGuildPresencesPrivileged:    "GUILD_PRESENCES",
+		IntentGuildPresences:              "GUILD_PRESENCES",
 		IntentGuildMessages:               "GUILD_MESSAGES",
 		IntentGuildMessageReactions:       "GUILD_MESSAGE_REACTIONS",
 		IntentGuildMessageTyping:          "GUILD_MESSAGE_TYPING",
 		IntentDirectMessages:              "DIRECT_MESSAGES",
 		IntentDirectMessageReactions:      "DIRECT_MESSAGE_REACTIONS",
 		IntentDirectMessageTyping:         "DIRECT_MESSAGE_TYPING",
-		IntentMessageContentPrivileged:    "MESSAGE_CONTENT",
+		IntentMessageContent:              "MESSAGE_CONTENT",
 		IntentGuildScheduledEvents:        "GUILD_SCHEDULED_EVENTS",
 		IntentAutoModerationConfiguration: "AUTO_MODERATION_CONFIGURATION",
 		IntentAutoModerationExecution:     "AUTO_MODERATION_EXECUTION",
