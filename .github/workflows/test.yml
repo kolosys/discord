@@ -1,4 +1,4 @@
-name: Lint & Format
+name: Test
 on:
   push:
   pull_request:
@@ -6,8 +6,8 @@ on:
 
 
 jobs:
-  lint:
-    uses: kolosys/.actions/.github/workflows/go-lint.yml@main
+  test:
+    uses: kolosys/.actions/.github/workflows/go-test.yml@main
     permissions: write-all
     secrets:
       app_id: ${{ vars.APP_ID }}
