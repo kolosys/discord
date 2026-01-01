@@ -252,6 +252,30 @@ func (r *REST) CreateFollowupMessage(ctx context.Context, appID, token string, m
 
 // Application command endpoints
 
+// ListGlobalCommands retrieves all global application commands.
+func (r *REST) ListGlobalCommands(ctx context.Context, appID string) ([]models.ApplicationCommand, error) {
+	if err := r.wait(ctx, "GET", "/applications/"+appID+"/commands"); err != nil {
+		return nil, err
+	}
+	resp, err := r.client.ListApplicationCommands(ctx, models.SnowflakeType(appID))
+	if err != nil {
+		return nil, fmt.Errorf("list global commands: %w", err)
+	}
+	return resp.Data, nil
+}
+
+// ListGuildCommands retrieves all guild application commands.
+func (r *REST) ListGuildCommands(ctx context.Context, appID, guildID string) ([]models.ApplicationCommand, error) {
+	if err := r.wait(ctx, "GET", "/applications/"+appID+"/guilds/"+guildID+"/commands"); err != nil {
+		return nil, err
+	}
+	resp, err := r.client.ListGuildApplicationCommands(ctx, models.SnowflakeType(appID), models.SnowflakeType(guildID))
+	if err != nil {
+		return nil, fmt.Errorf("list guild commands: %w", err)
+	}
+	return resp.Data, nil
+}
+
 // BulkOverwriteGlobalCommands replaces all global application commands.
 func (r *REST) BulkOverwriteGlobalCommands(ctx context.Context, appID string, commands any) ([]models.ApplicationCommand, error) {
 	if err := r.wait(ctx, "PUT", "/applications/"+appID+"/commands"); err != nil {

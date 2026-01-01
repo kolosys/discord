@@ -13,8 +13,26 @@ import (
 
 // CommandSyncer is an interface for syncing commands with Discord.
 type CommandSyncer interface {
-	SyncCommands(ctx context.Context, appID string, commands []ApplicationCommandCreate) error
-	SyncGuildCommands(ctx context.Context, appID, guildID string, commands []ApplicationCommandCreate) error
+	GetCommands(ctx context.Context, appID string) ([]RegisteredCommand, error)
+	GetGuildCommands(ctx context.Context, appID, guildID string) ([]RegisteredCommand, error)
+	SyncCommands(ctx context.Context, appID string, commands []ApplicationCommandCreate) ([]RegisteredCommand, error)
+	SyncGuildCommands(ctx context.Context, appID, guildID string, commands []ApplicationCommandCreate) ([]RegisteredCommand, error)
+}
+
+// RegisteredCommand represents a command registered with Discord.
+type RegisteredCommand struct {
+	ID                       string
+	Name                     string
+	NameLocalizations        map[string]string
+	Description              string
+	DescriptionLocalizations map[string]string
+	Type                     int32
+	Options                  []any
+	DefaultMemberPermissions *string
+	DMPermission             bool
+	Contexts                 []int32
+	IntegrationTypes         []int32
+	NSFW                     bool
 }
 
 // Router handles routing interactions to commands and components.
@@ -563,7 +581,44 @@ func parseOptions(interaction *Interaction) *OptionMap {
 }
 
 // Sync syncs all registered commands with Discord.
+// Commands not registered in code will be removed from Discord.
 func (r *Router) Sync(ctx context.Context) error {
+	result, err := r.syncInternal(ctx, true)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("commands: synced globally - %d created, %d updated, %d deprecated",
+		len(result.Created), len(result.Updated), len(result.Deprecated))
+
+	for _, name := range result.Deprecated {
+		log.Printf("commands: deprecated command %q", name)
+	}
+
+	return nil
+}
+
+// SyncWithResult syncs all registered commands and returns detailed results.
+// Commands not registered in code will be removed from Discord.
+func (r *Router) SyncWithResult(ctx context.Context) (*SyncResult, error) {
+	return r.syncInternal(ctx, true)
+}
+
+// SyncPreserve syncs registered commands without removing unknown commands.
+// Existing commands not in code are preserved on Discord.
+func (r *Router) SyncPreserve(ctx context.Context) error {
+	result, err := r.syncInternal(ctx, false)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("commands: synced globally (preserve mode) - %d created, %d updated, %d preserved",
+		len(result.Created), len(result.Updated), len(result.Preserved))
+
+	return nil
+}
+
+func (r *Router) syncInternal(ctx context.Context, autoDeprecate bool) (*SyncResult, error) {
 	r.mu.RLock()
 	syncer := r.syncer
 	appID := r.appID
@@ -572,27 +627,108 @@ func (r *Router) Sync(ctx context.Context) error {
 	r.mu.RUnlock()
 
 	if syncer == nil {
-		return fmt.Errorf("commands: no syncer configured")
+		return nil, fmt.Errorf("commands: no syncer configured")
 	}
 
-	// Build application commands
-	appCmds := make([]ApplicationCommandCreate, 0, len(commands)+len(groups))
+	// Fetch currently registered commands from Discord
+	existing, err := syncer.GetCommands(ctx, appID)
+	if err != nil {
+		return nil, fmt.Errorf("commands: failed to fetch existing commands: %w", err)
+	}
+
+	// Build set of known command names and app commands
+	knownNames := make(map[string]struct{}, len(commands)+len(groups))
+	appCmds := make([]ApplicationCommandCreate, 0, len(commands)+len(groups)+len(existing))
 
 	for _, cmd := range commands {
 		appCmd := commandToApplicationCommand(cmd)
 		appCmds = append(appCmds, appCmd)
+		knownNames[cmd.Name()] = struct{}{}
 	}
 
 	for _, group := range groups {
 		appCmd := groupToApplicationCommand(group)
 		appCmds = append(appCmds, appCmd)
+		knownNames[group.Name] = struct{}{}
 	}
 
-	return syncer.SyncCommands(ctx, appID, appCmds)
+	// Build set of existing command names
+	existingNames := make(map[string]struct{}, len(existing))
+	existingCmds := make(map[string]RegisteredCommand, len(existing))
+	for _, cmd := range existing {
+		existingNames[cmd.Name] = struct{}{}
+		existingCmds[cmd.Name] = cmd
+	}
+
+	// Determine created, updated, deprecated/preserved
+	result := &SyncResult{}
+	for name := range knownNames {
+		if _, exists := existingNames[name]; exists {
+			result.Updated = append(result.Updated, name)
+		} else {
+			result.Created = append(result.Created, name)
+		}
+	}
+
+	// Handle unknown commands based on autoDeprecate setting
+	for _, cmd := range existing {
+		if _, known := knownNames[cmd.Name]; !known {
+			if autoDeprecate {
+				result.Deprecated = append(result.Deprecated, cmd.Name)
+			} else {
+				result.Preserved = append(result.Preserved, cmd.Name)
+				appCmds = append(appCmds, registeredToCreate(cmd))
+			}
+		}
+	}
+
+	// BulkOverwrite syncs commands (removes those not in payload when autoDeprecate)
+	_, err = syncer.SyncCommands(ctx, appID, appCmds)
+	if err != nil {
+		return nil, fmt.Errorf("commands: failed to sync: %w", err)
+	}
+
+	return result, nil
 }
 
 // SyncGuild syncs all registered commands with a specific guild.
+// Commands not registered in code will be removed from the guild.
 func (r *Router) SyncGuild(ctx context.Context, guildID string) error {
+	result, err := r.syncGuildInternal(ctx, guildID, true)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("commands: synced to guild %s - %d created, %d updated, %d deprecated",
+		guildID, len(result.Created), len(result.Updated), len(result.Deprecated))
+
+	for _, name := range result.Deprecated {
+		log.Printf("commands: deprecated command %q in guild %s", name, guildID)
+	}
+
+	return nil
+}
+
+// SyncGuildWithResult syncs commands to a guild and returns detailed results.
+// Commands not registered in code will be removed from the guild.
+func (r *Router) SyncGuildWithResult(ctx context.Context, guildID string) (*SyncResult, error) {
+	return r.syncGuildInternal(ctx, guildID, true)
+}
+
+// SyncGuildPreserve syncs registered commands to a guild without removing unknown commands.
+func (r *Router) SyncGuildPreserve(ctx context.Context, guildID string) error {
+	result, err := r.syncGuildInternal(ctx, guildID, false)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("commands: synced to guild %s (preserve mode) - %d created, %d updated, %d preserved",
+		guildID, len(result.Created), len(result.Updated), len(result.Preserved))
+
+	return nil
+}
+
+func (r *Router) syncGuildInternal(ctx context.Context, guildID string, autoDeprecate bool) (*SyncResult, error) {
 	r.mu.RLock()
 	syncer := r.syncer
 	appID := r.appID
@@ -601,22 +737,66 @@ func (r *Router) SyncGuild(ctx context.Context, guildID string) error {
 	r.mu.RUnlock()
 
 	if syncer == nil {
-		return fmt.Errorf("commands: no syncer configured")
+		return nil, fmt.Errorf("commands: no syncer configured")
 	}
 
-	appCmds := make([]ApplicationCommandCreate, 0, len(commands)+len(groups))
+	// Fetch currently registered commands from Discord
+	existing, err := syncer.GetGuildCommands(ctx, appID, guildID)
+	if err != nil {
+		return nil, fmt.Errorf("commands: failed to fetch existing guild commands: %w", err)
+	}
+
+	// Build set of known command names and app commands
+	knownNames := make(map[string]struct{}, len(commands)+len(groups))
+	appCmds := make([]ApplicationCommandCreate, 0, len(commands)+len(groups)+len(existing))
 
 	for _, cmd := range commands {
 		appCmd := commandToApplicationCommand(cmd)
 		appCmds = append(appCmds, appCmd)
+		knownNames[cmd.Name()] = struct{}{}
 	}
 
 	for _, group := range groups {
 		appCmd := groupToApplicationCommand(group)
 		appCmds = append(appCmds, appCmd)
+		knownNames[group.Name] = struct{}{}
 	}
 
-	return syncer.SyncGuildCommands(ctx, appID, guildID, appCmds)
+	// Build set of existing command names
+	existingNames := make(map[string]struct{}, len(existing))
+	for _, cmd := range existing {
+		existingNames[cmd.Name] = struct{}{}
+	}
+
+	// Determine created, updated, deprecated/preserved
+	result := &SyncResult{}
+	for name := range knownNames {
+		if _, exists := existingNames[name]; exists {
+			result.Updated = append(result.Updated, name)
+		} else {
+			result.Created = append(result.Created, name)
+		}
+	}
+
+	// Handle unknown commands based on autoDeprecate setting
+	for _, cmd := range existing {
+		if _, known := knownNames[cmd.Name]; !known {
+			if autoDeprecate {
+				result.Deprecated = append(result.Deprecated, cmd.Name)
+			} else {
+				result.Preserved = append(result.Preserved, cmd.Name)
+				appCmds = append(appCmds, registeredToCreate(cmd))
+			}
+		}
+	}
+
+	// BulkOverwrite syncs commands (removes those not in payload when autoDeprecate)
+	_, err = syncer.SyncGuildCommands(ctx, appID, guildID, appCmds)
+	if err != nil {
+		return nil, fmt.Errorf("commands: failed to sync to guild: %w", err)
+	}
+
+	return result, nil
 }
 
 // Interaction represents a Discord interaction.
@@ -691,15 +871,17 @@ type ResolvedInteractionData struct {
 
 // ApplicationCommandCreate represents a command to create with Discord.
 type ApplicationCommandCreate struct {
-	Name                     string                     `json:"name"`
-	Description              string                     `json:"description,omitempty"`
-	Type                     int32                      `json:"type,omitempty"`
-	Options                  []ApplicationCommandOption `json:"options,omitempty"`
-	DefaultMemberPermissions *string                    `json:"default_member_permissions,omitempty"`
-	DMPermission             *bool                      `json:"dm_permission,omitempty"`
-	Contexts                 []int32                    `json:"contexts,omitempty"`
-	IntegrationTypes         []int32                    `json:"integration_types,omitempty"`
-	NSFW                     bool                       `json:"nsfw,omitempty"`
+	Name                     string            `json:"name"`
+	NameLocalizations        map[string]string `json:"name_localizations,omitempty"`
+	Description              string            `json:"description,omitempty"`
+	DescriptionLocalizations map[string]string `json:"description_localizations,omitempty"`
+	Type                     int32             `json:"type,omitempty"`
+	Options                  any               `json:"options,omitempty"`
+	DefaultMemberPermissions *string           `json:"default_member_permissions,omitempty"`
+	DMPermission             *bool             `json:"dm_permission,omitempty"`
+	Contexts                 []int32           `json:"contexts,omitempty"`
+	IntegrationTypes         []int32           `json:"integration_types,omitempty"`
+	NSFW                     bool              `json:"nsfw,omitempty"`
 }
 
 // ApplicationCommandOption represents an option for an application command.
@@ -731,11 +913,13 @@ func commandToApplicationCommand(cmd Command) ApplicationCommandCreate {
 		Type:        int32(cmd.Type()),
 	}
 
+	var options []ApplicationCommandOption
+
 	if op, ok := cmd.(OptionProvider); ok {
 		opts := op.Options()
-		appCmd.Options = make([]ApplicationCommandOption, len(opts))
+		options = make([]ApplicationCommandOption, len(opts))
 		for i, opt := range opts {
-			appCmd.Options[i] = optionToApplicationOption(opt)
+			options[i] = optionToApplicationOption(opt)
 		}
 	}
 
@@ -754,8 +938,12 @@ func commandToApplicationCommand(cmd Command) ApplicationCommandCreate {
 					subOpt.Options[i] = optionToApplicationOption(opt)
 				}
 			}
-			appCmd.Options = append(appCmd.Options, subOpt)
+			options = append(options, subOpt)
 		}
+	}
+
+	if len(options) > 0 {
+		appCmd.Options = options
 	}
 
 	return appCmd
@@ -768,6 +956,7 @@ func groupToApplicationCommand(group *CommandGroup) ApplicationCommandCreate {
 		Type:        int32(CommandTypeChatInput),
 	}
 
+	var options []ApplicationCommandOption
 	for _, cmd := range group.Commands {
 		subOpt := ApplicationCommandOption{
 			Name:        cmd.Name(),
@@ -781,10 +970,35 @@ func groupToApplicationCommand(group *CommandGroup) ApplicationCommandCreate {
 				subOpt.Options[i] = optionToApplicationOption(opt)
 			}
 		}
-		appCmd.Options = append(appCmd.Options, subOpt)
+		options = append(options, subOpt)
+	}
+
+	if len(options) > 0 {
+		appCmd.Options = options
 	}
 
 	return appCmd
+}
+
+func registeredToCreate(cmd RegisteredCommand) ApplicationCommandCreate {
+	var dmPerm *bool
+	if cmd.DMPermission {
+		dmPerm = &cmd.DMPermission
+	}
+
+	return ApplicationCommandCreate{
+		Name:                     cmd.Name,
+		NameLocalizations:        cmd.NameLocalizations,
+		Description:              cmd.Description,
+		DescriptionLocalizations: cmd.DescriptionLocalizations,
+		Type:                     cmd.Type,
+		Options:                  cmd.Options,
+		DefaultMemberPermissions: cmd.DefaultMemberPermissions,
+		DMPermission:             dmPerm,
+		Contexts:                 cmd.Contexts,
+		IntegrationTypes:         cmd.IntegrationTypes,
+		NSFW:                     cmd.NSFW,
+	}
 }
 
 func optionToApplicationOption(opt Option) ApplicationCommandOption {

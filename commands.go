@@ -131,22 +131,73 @@ func (b *Bot) FollowupMessage(ctx context.Context, token string, message *comman
 
 // CommandSyncer interface implementation
 
-// SyncCommands syncs commands globally.
-func (b *Bot) SyncCommands(ctx context.Context, appID string, cmds []commands.ApplicationCommandCreate) error {
-	_, err := b.REST.BulkOverwriteGlobalCommands(ctx, appID, cmds)
+// GetCommands retrieves all global commands from Discord.
+func (b *Bot) GetCommands(ctx context.Context, appID string) ([]commands.RegisteredCommand, error) {
+	cmds, err := b.REST.ListGlobalCommands(ctx, appID)
 	if err != nil {
-		return fmt.Errorf("discord: failed to sync commands: %w", err)
+		return nil, fmt.Errorf("discord: failed to get commands: %w", err)
 	}
-	return nil
+	result := make([]commands.RegisteredCommand, len(cmds))
+	for i, cmd := range cmds {
+		result[i] = toRegisteredCommand(cmd)
+	}
+	return result, nil
+}
+
+// GetGuildCommands retrieves all commands for a specific guild from Discord.
+func (b *Bot) GetGuildCommands(ctx context.Context, appID, guildID string) ([]commands.RegisteredCommand, error) {
+	cmds, err := b.REST.ListGuildCommands(ctx, appID, guildID)
+	if err != nil {
+		return nil, fmt.Errorf("discord: failed to get guild commands: %w", err)
+	}
+	result := make([]commands.RegisteredCommand, len(cmds))
+	for i, cmd := range cmds {
+		result[i] = toRegisteredCommand(cmd)
+	}
+	return result, nil
+}
+
+func toRegisteredCommand(cmd models.ApplicationCommand) commands.RegisteredCommand {
+	return commands.RegisteredCommand{
+		ID:                       cmd.ID,
+		Name:                     cmd.Name,
+		NameLocalizations:        cmd.NameLocalizations,
+		Description:              cmd.Description,
+		DescriptionLocalizations: cmd.DescriptionLocalizations,
+		Type:                     cmd.Type,
+		Options:                  cmd.Options,
+		DefaultMemberPermissions: cmd.DefaultMemberPermissions,
+		DMPermission:             cmd.DmPermission,
+		Contexts:                 cmd.Contexts,
+		IntegrationTypes:         cmd.IntegrationTypes,
+		NSFW:                     cmd.Nsfw,
+	}
+}
+
+// SyncCommands syncs commands globally.
+func (b *Bot) SyncCommands(ctx context.Context, appID string, cmds []commands.ApplicationCommandCreate) ([]commands.RegisteredCommand, error) {
+	synced, err := b.REST.BulkOverwriteGlobalCommands(ctx, appID, cmds)
+	if err != nil {
+		return nil, fmt.Errorf("discord: failed to sync commands: %w", err)
+	}
+	result := make([]commands.RegisteredCommand, len(synced))
+	for i, cmd := range synced {
+		result[i] = toRegisteredCommand(cmd)
+	}
+	return result, nil
 }
 
 // SyncGuildCommands syncs commands to a specific guild.
-func (b *Bot) SyncGuildCommands(ctx context.Context, appID, guildID string, cmds []commands.ApplicationCommandCreate) error {
-	_, err := b.REST.BulkOverwriteGuildCommands(ctx, appID, guildID, cmds)
+func (b *Bot) SyncGuildCommands(ctx context.Context, appID, guildID string, cmds []commands.ApplicationCommandCreate) ([]commands.RegisteredCommand, error) {
+	synced, err := b.REST.BulkOverwriteGuildCommands(ctx, appID, guildID, cmds)
 	if err != nil {
-		return fmt.Errorf("discord: failed to sync guild commands: %w", err)
+		return nil, fmt.Errorf("discord: failed to sync guild commands: %w", err)
 	}
-	return nil
+	result := make([]commands.RegisteredCommand, len(synced))
+	for i, cmd := range synced {
+		result[i] = toRegisteredCommand(cmd)
+	}
+	return result, nil
 }
 
 // HTTP Interactions Endpoint

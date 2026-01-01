@@ -12,8 +12,10 @@ type SyncOptions struct {
 	// If empty, syncs globally.
 	GuildIDs []string
 
-	// DeleteUnknown removes commands not registered in the router.
-	DeleteUnknown bool
+	// AutoDeprecate removes commands from Discord that are not registered in code.
+	// When true (default behavior for Sync/SyncGuild), unknown commands are deleted.
+	// When false, existing commands not in code are preserved.
+	AutoDeprecate bool
 
 	// DryRun logs what would happen without making changes.
 	DryRun bool
@@ -21,14 +23,52 @@ type SyncOptions struct {
 
 // SyncResult contains the result of a sync operation.
 type SyncResult struct {
-	Created []string
-	Updated []string
-	Deleted []string
-	Errors  []error
+	Created    []string
+	Updated    []string
+	Deprecated []string
+	Preserved  []string
+	Errors     []error
 }
 
 // SyncWithOptions syncs commands with custom options.
 func (r *Router) SyncWithOptions(ctx context.Context, opts *SyncOptions) (*SyncResult, error) {
+	if opts == nil {
+		opts = &SyncOptions{AutoDeprecate: true}
+	}
+
+	if opts.DryRun {
+		return r.dryRunSync(ctx, opts)
+	}
+
+	combined := &SyncResult{}
+
+	if len(opts.GuildIDs) > 0 {
+		for _, guildID := range opts.GuildIDs {
+			result, err := r.syncGuildInternal(ctx, guildID, opts.AutoDeprecate)
+			if err != nil {
+				combined.Errors = append(combined.Errors, fmt.Errorf("guild %s: %w", guildID, err))
+				continue
+			}
+			combined.Created = append(combined.Created, result.Created...)
+			combined.Updated = append(combined.Updated, result.Updated...)
+			combined.Deprecated = append(combined.Deprecated, result.Deprecated...)
+		}
+	} else {
+		result, err := r.syncInternal(ctx, opts.AutoDeprecate)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	if len(combined.Errors) > 0 {
+		return combined, fmt.Errorf("commands: sync completed with %d errors", len(combined.Errors))
+	}
+
+	return combined, nil
+}
+
+func (r *Router) dryRunSync(ctx context.Context, opts *SyncOptions) (*SyncResult, error) {
 	r.mu.RLock()
 	syncer := r.syncer
 	appID := r.appID
@@ -40,52 +80,74 @@ func (r *Router) SyncWithOptions(ctx context.Context, opts *SyncOptions) (*SyncR
 		return nil, fmt.Errorf("commands: no syncer configured")
 	}
 
-	result := &SyncResult{}
-
-	// Build application commands
+	// Build known command names
+	knownNames := make(map[string]struct{}, len(commands)+len(groups))
 	appCmds := make([]ApplicationCommandCreate, 0, len(commands)+len(groups))
 
 	for _, cmd := range commands {
 		appCmd := commandToApplicationCommand(cmd)
 		appCmds = append(appCmds, appCmd)
-		result.Created = append(result.Created, cmd.Name())
+		knownNames[cmd.Name()] = struct{}{}
 	}
 
 	for _, group := range groups {
 		appCmd := groupToApplicationCommand(group)
 		appCmds = append(appCmds, appCmd)
-		result.Created = append(result.Created, group.Name)
+		knownNames[group.Name] = struct{}{}
 	}
 
-	if opts.DryRun {
-		log.Printf("[DRY RUN] Would sync %d commands", len(appCmds))
-		for _, cmd := range appCmds {
-			log.Printf("[DRY RUN]   - %s (%s)", cmd.Name, commandTypeName(cmd.Type))
-		}
-		return result, nil
+	mode := "auto-deprecate"
+	if !opts.AutoDeprecate {
+		mode = "preserve"
+	}
+	log.Printf("[DRY RUN] Would sync %d commands (mode: %s)", len(appCmds), mode)
+	for _, cmd := range appCmds {
+		log.Printf("[DRY RUN]   - %s (%s)", cmd.Name, commandTypeName(cmd.Type))
 	}
 
-	// Sync based on options
+	result := &SyncResult{}
+
+	// Fetch existing commands to show what would be deprecated/preserved
 	if len(opts.GuildIDs) > 0 {
-		// Guild-specific sync
 		for _, guildID := range opts.GuildIDs {
-			if err := syncer.SyncGuildCommands(ctx, appID, guildID, appCmds); err != nil {
-				result.Errors = append(result.Errors, fmt.Errorf("guild %s: %w", guildID, err))
-			} else {
-				log.Printf("Synced %d commands to guild %s", len(appCmds), guildID)
+			existing, err := syncer.GetGuildCommands(ctx, appID, guildID)
+			if err != nil {
+				log.Printf("[DRY RUN] Failed to fetch guild %s commands: %v", guildID, err)
+				continue
+			}
+			for _, cmd := range existing {
+				if _, known := knownNames[cmd.Name]; !known {
+					if opts.AutoDeprecate {
+						result.Deprecated = append(result.Deprecated, cmd.Name)
+						log.Printf("[DRY RUN] Would deprecate %q in guild %s", cmd.Name, guildID)
+					} else {
+						result.Preserved = append(result.Preserved, cmd.Name)
+						log.Printf("[DRY RUN] Would preserve %q in guild %s", cmd.Name, guildID)
+					}
+				}
 			}
 		}
 	} else {
-		// Global sync
-		if err := syncer.SyncCommands(ctx, appID, appCmds); err != nil {
-			result.Errors = append(result.Errors, err)
-			return result, err
+		existing, err := syncer.GetCommands(ctx, appID)
+		if err != nil {
+			log.Printf("[DRY RUN] Failed to fetch global commands: %v", err)
+		} else {
+			for _, cmd := range existing {
+				if _, known := knownNames[cmd.Name]; !known {
+					if opts.AutoDeprecate {
+						result.Deprecated = append(result.Deprecated, cmd.Name)
+						log.Printf("[DRY RUN] Would deprecate %q", cmd.Name)
+					} else {
+						result.Preserved = append(result.Preserved, cmd.Name)
+						log.Printf("[DRY RUN] Would preserve %q", cmd.Name)
+					}
+				}
+			}
 		}
-		log.Printf("Synced %d commands globally", len(appCmds))
 	}
 
-	if len(result.Errors) > 0 {
-		return result, fmt.Errorf("commands: sync completed with %d errors", len(result.Errors))
+	for name := range knownNames {
+		result.Created = append(result.Created, name)
 	}
 
 	return result, nil
