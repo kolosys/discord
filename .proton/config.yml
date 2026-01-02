@@ -8,7 +8,7 @@ repository:
 output:
   directory: /home/runner/work/discord/discord/docs
   clean: true
-  preserve_custom: false
+  preserve_custom: true
 discovery:
   packages:
     auto_discover: true
@@ -18,6 +18,7 @@ discovery:
       - ./vendor/...
       - ./test/...
       - ./.git/...
+      - ./examples/...
       - "**/*_test.go"
     skip_internal: true
     manual_packages: []
@@ -40,8 +41,8 @@ templates:
   custom_templates: []
 metadata:
   version: latest
-  go_version: "1.21"
-  author: ""
+  go_version: "1.24"
+  author: "Kolosys"
   license: MIT
 generation:
   date_format: "2006-01-02"
